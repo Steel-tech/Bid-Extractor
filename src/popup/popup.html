@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bid Extractor</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <!-- Digital Rain Background -->
+  <canvas id="digital-rain"></canvas>
+
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <div class="logo">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+          <polyline points="14 2 14 8 20 8"></polyline>
+          <line x1="16" y1="13" x2="8" y2="13"></line>
+          <line x1="16" y1="17" x2="8" y2="17"></line>
+          <polyline points="10 9 9 9 8 9"></polyline>
+        </svg>
+        <span>Bid Extractor</span>
+      </div>
+      <div class="status" id="status">
+        <span class="status-dot"></span>
+        <span id="status-text">ready</span>
+      </div>
+    </header>
+
+    <!-- Dashboard Stats -->
+    <div class="stats-dashboard">
+      <div class="stat-card urgent" id="stat-due-today">
+        <span class="stat-count" id="count-due-today">0</span>
+        <span class="stat-label">Due Today</span>
+      </div>
+      <div class="stat-card" id="stat-this-week">
+        <span class="stat-count" id="count-this-week">0</span>
+        <span class="stat-label">This Week</span>
+      </div>
+      <div class="stat-card" id="stat-high-priority">
+        <span class="stat-count" id="count-high-priority">0</span>
+        <span class="stat-label">High Priority</span>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main">
+      <!-- Extract Button -->
+      <div class="action-section">
+        <button id="extract-btn" class="btn btn-primary">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.3-4.3"></path>
+          </svg>
+          extract from email
+        </button>
+        <p class="hint">// open rfq email, then click to extract</p>
+      </div>
+
+      <!-- Extracted Data Preview -->
+      <div id="preview-section" class="preview-section hidden">
+        <h3>Extracted Data</h3>
+        <div class="preview-card">
+          <div class="preview-row">
+            <span class="label">project:</span>
+            <span id="preview-project" class="value">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">gc:</span>
+            <span id="preview-gc" class="value">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">bid_date:</span>
+            <span id="preview-date" class="value highlight">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">location:</span>
+            <span id="preview-location" class="value">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">scope:</span>
+            <span id="preview-scope" class="value">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">files:</span>
+            <span id="preview-attachments" class="value">-</span>
+          </div>
+        </div>
+
+        <!-- Download Links Section -->
+        <div id="links-section" class="links-section hidden">
+          <h4>Project Documents</h4>
+          <div id="links-list" class="links-list"></div>
+        </div>
+
+        <!-- Download Options -->
+        <div class="download-section">
+          <button id="download-btn" class="btn btn-success">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            download all
+          </button>
+          <button id="copy-btn" class="btn btn-secondary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            copy
+          </button>
+        </div>
+
+        <!-- Calendar Options -->
+        <div class="calendar-section">
+          <button id="calendar-btn" class="btn btn-calendar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            add to calendar
+          </button>
+          <div id="calendar-dropdown" class="calendar-dropdown hidden">
+            <button id="gcal-btn" class="dropdown-item">
+              <span class="cal-icon gcal">G</span> google calendar
+            </button>
+            <button id="outlook-btn" class="dropdown-item">
+              <span class="cal-icon outlook">O</span> outlook calendar
+            </button>
+            <button id="ical-btn" class="dropdown-item">
+              <span class="cal-icon ical">+</span> download .ics
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Extractions -->
+      <div class="recent-section">
+        <h3>Recent Extractions</h3>
+        <div id="recent-list" class="recent-list">
+          <p class="empty-state">no data found</p>
+        </div>
+      </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <button id="settings-btn" class="btn-icon" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </button>
+      <a href="https://structupath.ai" target="_blank" class="creator-credit" title="Created by Victor @ StructuPath.ai">structupath.ai</a>
+      <span class="version">v1.3.0</span>
+    </footer>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Settings</h3>
+        <button id="close-settings" class="btn-icon">×</button>
+      </div>
+      <div class="modal-body">
+        <div class="setting-row">
+          <label for="folder-pattern">download folder pattern:</label>
+          <input type="text" id="folder-pattern" value="Bids/{gc}_{date}_{project}" placeholder="Bids/{gc}_{date}_{project}">
+          <p class="hint">// variables: {project}, {gc}, {date}, {location}</p>
+        </div>
+        <div class="setting-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="auto-download" checked>
+            auto-download attachments
+          </label>
+        </div>
+        <div class="setting-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="create-summary" checked>
+            create bid_info.txt summary
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="save-settings" class="btn btn-primary">save settings</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background - rounded square -->
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="#f97316"/>
+
+  <!-- Document -->
+  <path d="M40 24 L80 24 L96 40 L96 104 L40 104 Z" fill="white"/>
+  <path d="M80 24 L80 40 L96 40" fill="none" stroke="#f97316" stroke-width="2"/>
+
+  <!-- Lines on document -->
+  <rect x="52" y="52" width="32" height="4" rx="2" fill="#f97316" opacity="0.6"/>
+  <rect x="52" y="64" width="28" height="4" rx="2" fill="#f97316" opacity="0.6"/>
+  <rect x="52" y="76" width="24" height="4" rx="2" fill="#f97316" opacity="0.6"/>
+
+  <!-- Extract arrow -->
+  <circle cx="36" cy="72" r="20" fill="#1e3a5f"/>
+  <path d="M36 82 L36 62 M28 70 L36 62 L44 70" stroke="white" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

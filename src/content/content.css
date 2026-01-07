@@ -1,0 +1,211 @@
+/* Bid Extractor - Matrix Inline Button Styles v1.3.0 */
+
+/* Matrix Color Variables */
+:root {
+  --matrix-green: #00ff00;
+  --matrix-green-dim: #00cc00;
+  --matrix-green-glow: rgba(0, 255, 0, 0.4);
+  --matrix-bg: rgba(10, 10, 10, 0.95);
+  --matrix-border: rgba(0, 255, 0, 0.5);
+  --matrix-success: #00ff88;
+  --matrix-error: #ff0040;
+}
+
+/* Main Inline Extract Button */
+.bid-extractor-inline-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  margin-left: 8px;
+  background: linear-gradient(180deg, rgba(0, 255, 0, 0.15) 0%, rgba(0, 255, 0, 0.05) 100%);
+  color: var(--matrix-green);
+  border: 1px solid var(--matrix-border);
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  text-transform: lowercase;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow:
+    0 0 15px rgba(0, 255, 0, 0.2),
+    inset 0 1px 0 rgba(0, 255, 0, 0.1);
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Shine animation overlay */
+.bid-extractor-inline-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(0, 255, 0, 0.2),
+    transparent
+  );
+  transition: left 0.5s ease;
+}
+
+.bid-extractor-inline-btn:hover::before {
+  left: 100%;
+}
+
+.bid-extractor-inline-btn:hover {
+  background: linear-gradient(180deg, rgba(0, 255, 0, 0.25) 0%, rgba(0, 255, 0, 0.1) 100%);
+  border-color: var(--matrix-green);
+  box-shadow:
+    0 0 25px rgba(0, 255, 0, 0.3),
+    0 0 50px rgba(0, 255, 0, 0.15),
+    inset 0 1px 0 rgba(0, 255, 0, 0.2);
+  transform: translateY(-1px);
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+}
+
+.bid-extractor-inline-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    0 0 10px rgba(0, 255, 0, 0.4),
+    inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Icon styling */
+.bid-extractor-icon {
+  font-size: 14px;
+  filter: drop-shadow(0 0 3px var(--matrix-green-glow));
+}
+
+/* Success state - extraction complete */
+.bid-extractor-inline-btn.success {
+  background: linear-gradient(180deg, rgba(0, 255, 136, 0.2) 0%, rgba(0, 255, 136, 0.05) 100%);
+  color: var(--matrix-success);
+  border-color: var(--matrix-success);
+  box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+  text-shadow: 0 0 8px rgba(0, 255, 136, 0.6);
+}
+
+/* Error state */
+.bid-extractor-inline-btn.error {
+  background: linear-gradient(180deg, rgba(255, 0, 64, 0.2) 0%, rgba(255, 0, 64, 0.05) 100%);
+  color: var(--matrix-error);
+  border-color: var(--matrix-error);
+  box-shadow: 0 0 20px rgba(255, 0, 64, 0.3);
+  text-shadow: 0 0 8px rgba(255, 0, 64, 0.6);
+}
+
+/* Loading state - pulsing animation */
+.bid-extractor-inline-btn.loading {
+  animation: matrixPulse 1s ease-in-out infinite;
+}
+
+@keyframes matrixPulse {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(0, 255, 0, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(0, 255, 0, 0.5);
+  }
+}
+
+/* Matrix Notification Toast */
+.bid-extractor-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  padding: 14px 24px;
+  background: var(--matrix-bg);
+  color: var(--matrix-green);
+  border: 1px solid var(--matrix-border);
+  border-radius: 4px;
+  font-size: 13px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  text-transform: lowercase;
+  z-index: 10000;
+  animation: matrixSlideIn 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+  box-shadow:
+    0 0 30px rgba(0, 255, 0, 0.2),
+    0 4px 20px rgba(0, 0, 0, 0.5);
+  text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+  backdrop-filter: blur(10px);
+}
+
+.bid-extractor-toast.success {
+  background: rgba(0, 255, 136, 0.1);
+  color: var(--matrix-success);
+  border-color: var(--matrix-success);
+  box-shadow:
+    0 0 30px rgba(0, 255, 136, 0.3),
+    0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.bid-extractor-toast.error {
+  background: rgba(255, 0, 64, 0.1);
+  color: var(--matrix-error);
+  border-color: var(--matrix-error);
+  box-shadow:
+    0 0 30px rgba(255, 0, 64, 0.3),
+    0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes matrixSlideIn {
+  from {
+    transform: translateX(100%) scale(0.8);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* Highlight extracted fields with Matrix glow */
+.bid-extractor-highlight {
+  background: rgba(0, 255, 0, 0.08);
+  border: 1px dashed rgba(0, 255, 0, 0.4);
+  border-radius: 2px;
+  padding: 2px 4px;
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.15);
+}
+
+/* Terminal cursor animation for active extractions */
+.bid-extractor-inline-btn.extracting::after {
+  content: '_';
+  animation: blink 0.8s step-end infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Scanline effect on hover (optional enhancement) */
+.bid-extractor-inline-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 255, 0, 0.03) 2px,
+    rgba(0, 255, 0, 0.03) 4px
+  );
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.bid-extractor-inline-btn:hover::after {
+  opacity: 1;
+}

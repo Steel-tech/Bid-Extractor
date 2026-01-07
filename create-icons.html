@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Generate Bid Extractor Icons</title>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    canvas { border: 1px solid #ccc; margin: 10px; }
+    .downloads { margin-top: 20px; }
+    a { display: inline-block; margin: 5px; padding: 10px 15px; background: #f97316; color: white; text-decoration: none; border-radius: 5px; }
+  </style>
+</head>
+<body>
+  <h1>Bid Extractor Icon Generator</h1>
+  <p>Click each link to download the icon, then save to the <code>icons/</code> folder.</p>
+
+  <div id="canvases"></div>
+  <div class="downloads" id="downloads"></div>
+
+  <script>
+    const sizes = [16, 32, 48, 128];
+    const canvasContainer = document.getElementById('canvases');
+    const downloadsContainer = document.getElementById('downloads');
+
+    sizes.forEach(size => {
+      const canvas = document.createElement('canvas');
+      canvas.width = size;
+      canvas.height = size;
+      canvas.id = `icon${size}`;
+
+      const ctx = canvas.getContext('2d');
+
+      // Background
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, size * 0.15);
+      ctx.fill();
+
+      // Document icon
+      ctx.fillStyle = 'white';
+      const padding = size * 0.2;
+      const docWidth = size * 0.5;
+      const docHeight = size * 0.6;
+      const docX = (size - docWidth) / 2;
+      const docY = (size - docHeight) / 2;
+
+      ctx.beginPath();
+      ctx.roundRect(docX, docY, docWidth, docHeight, size * 0.05);
+      ctx.fill();
+
+      // Lines on document
+      ctx.fillStyle = '#f97316';
+      const lineHeight = size * 0.05;
+      const lineWidth = docWidth * 0.6;
+      const lineX = docX + (docWidth - lineWidth) / 2;
+
+      for (let i = 0; i < 3; i++) {
+        const lineY = docY + docHeight * 0.25 + (i * docHeight * 0.2);
+        ctx.fillRect(lineX, lineY, lineWidth, lineHeight);
+      }
+
+      canvasContainer.appendChild(canvas);
+
+      // Create download link
+      const link = document.createElement('a');
+      link.download = `icon${size}.png`;
+      link.href = canvas.toDataURL('image/png');
+      link.textContent = `Download icon${size}.png`;
+      downloadsContainer.appendChild(link);
+    });
+  </script>
+</body>
+</html>
