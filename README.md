@@ -363,9 +363,11 @@ bid-extractor/
 
 ## 📜 License
 
-**Proprietary Software** - All rights reserved.
+**MIT License** - Open Source
 
-This software is the intellectual property of StructuPath.ai. Unauthorized copying, modification, distribution, or commercial use of this software is strictly prohibited without written permission.
+Copyright (c) 2026 Victor Garcia / StructuPath.ai
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies. See the [LICENSE](LICENSE) file for full details.
 
 ---
 
@@ -408,6 +410,6 @@ For support, feature requests, or bug reports:
 
 **Built with precision by [Victor Garcia](https://structupath.ai) @ StructuPath.ai**
 
-*© 2025 StructuPath.ai - All Rights Reserved*
+*© 2026 Victor Garcia / StructuPath.ai - MIT License*
 
 </div>
