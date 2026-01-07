@@ -83,7 +83,6 @@ async function extractBidInfo() {
   }
 
   if (!emailBody) {
-    console.log('Available elements:', document.body.innerHTML.substring(0, 500));
     throw new Error('Could not find email content - try clicking on the email');
   }
 

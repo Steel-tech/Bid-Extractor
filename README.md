@@ -332,12 +332,32 @@ bid-extractor/
 
 ---
 
-## 🔒 Privacy
+## 🔒 Privacy & Security
 
-- **No data sent anywhere** - All processing happens locally in your browser
-- **No tracking** - We don't collect any analytics or usage data
-- **Local storage only** - Extracted data stored only in Chrome's local storage
-- **You control everything** - What gets downloaded and where
+### Data Handling
+- **100% Local Processing** - All extraction happens entirely in your browser
+- **Zero External Servers** - No data is ever sent to any external servers or APIs
+- **No Analytics** - We collect absolutely no usage data, telemetry, or tracking
+- **No Account Required** - Works completely offline after installation
+
+### What Gets Stored
+- **Chrome Local Storage Only** - Extracted bid data is saved only in your browser's local storage
+- **Never Synced** - Data is NOT synced to Google or any cloud service
+- **You Own Your Data** - Export, delete, or manage your data anytime
+
+### Permissions Explained
+| Permission | Why We Need It |
+|------------|----------------|
+| `activeTab` | Access the current email when you click "Extract" |
+| `storage` | Save your extracted bids locally for the dashboard |
+| `downloads` | Save attachments and info sheets to your Downloads folder |
+| `tabs` | Check if you're on a supported email/bid platform |
+
+### Security
+- **Open Source** - Full code available for review on GitHub
+- **No Obfuscation** - Clean, readable JavaScript you can audit
+- **Minimal Permissions** - Only requests what's absolutely necessary
+- **MIT Licensed** - Transparent and permissive licensing
 
 ---
 
@@ -355,7 +375,7 @@ This software is the intellectual property of StructuPath.ai. Unauthorized copyi
 
 ### Created by
 
-# **Victor**
+# **Victor Garcia**
 
 ## 🏗️ [StructuPath.ai](https://structupath.ai)
 
@@ -386,7 +406,7 @@ For support, feature requests, or bug reports:
 
 ---
 
-**Built with precision by [Victor](https://structupath.ai) @ StructuPath.ai**
+**Built with precision by [Victor Garcia](https://structupath.ai) @ StructuPath.ai**
 
 *© 2025 StructuPath.ai - All Rights Reserved*
 
