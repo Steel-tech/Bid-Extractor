@@ -95,6 +95,12 @@
           <div id="links-list" class="links-list"></div>
         </div>
 
+        <!-- Blueprint Section -->
+        <div id="blueprint-section" class="blueprint-section hidden">
+          <h4>Blueprints</h4>
+          <div id="blueprint-list" class="blueprint-list"></div>
+        </div>
+
         <!-- Download Options -->
         <div class="download-section">
           <button id="download-btn" class="btn btn-success">
@@ -188,6 +194,26 @@
             <input type="checkbox" id="create-summary" checked>
             create bid_info.txt summary
           </label>
+        </div>
+
+        <div class="setting-divider"></div>
+        <h4 class="setting-section-title">Blueprint Settings</h4>
+
+        <div class="setting-row">
+          <label for="blueprint-naming">blueprint naming pattern:</label>
+          <input type="text" id="blueprint-naming" value="{project}_{sheet}_{rev}" placeholder="{project}_{sheet}_{rev}">
+          <p class="hint">// variables: {project}, {sheet}, {rev}, {date}</p>
+        </div>
+        <div class="setting-row">
+          <label class="checkbox-label">
+            <input type="checkbox" id="auto-rename-blueprint">
+            auto-rename blueprints on download
+          </label>
+        </div>
+        <div class="setting-row">
+          <label for="vision-api-key">google vision api key (for OCR):</label>
+          <input type="password" id="vision-api-key" placeholder="Enter API key for blueprint OCR">
+          <p class="hint">// <a href="https://cloud.google.com/vision/docs/setup" target="_blank">get api key</a></p>
         </div>
       </div>
       <div class="modal-footer">

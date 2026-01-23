@@ -970,6 +970,113 @@ body::before {
   cursor: pointer;
 }
 
+.setting-divider {
+  height: 1px;
+  background: rgba(0, 255, 0, 0.1);
+  margin: 16px 0;
+}
+
+.setting-section-title {
+  font-size: 11px;
+  color: var(--matrix-green);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+  font-family: var(--font-terminal);
+}
+
+.setting-row .hint a {
+  color: var(--matrix-green);
+  text-decoration: none;
+}
+
+.setting-row .hint a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================
+   BLUEPRINT SECTION
+   ============================================ */
+.blueprint-section {
+  background: rgba(0, 150, 255, 0.03);
+  border: 1px solid rgba(0, 150, 255, 0.15);
+  border-radius: 8px;
+  padding: 12px;
+  margin-top: 12px;
+}
+
+.blueprint-section h4 {
+  font-size: 11px;
+  color: #00aaff;
+  margin: 0 0 10px 0;
+  font-weight: 600;
+  font-family: var(--font-terminal);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.blueprint-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.blueprint-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--bg-dark);
+  border: 1px solid rgba(0, 150, 255, 0.08);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.blueprint-item:hover {
+  background: rgba(0, 150, 255, 0.05);
+  border-color: rgba(0, 150, 255, 0.25);
+  transform: translateX(4px);
+  box-shadow: 0 0 15px rgba(0, 150, 255, 0.1);
+}
+
+.blueprint-icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.blueprint-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.blueprint-name {
+  font-size: 12px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.blueprint-size {
+  font-size: 10px;
+  color: var(--text-dim);
+  font-family: var(--font-terminal);
+}
+
+.blueprint-action {
+  color: #00aaff;
+  font-size: 11px;
+  flex-shrink: 0;
+  font-family: var(--font-terminal);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.blueprint-item:hover .blueprint-action {
+  opacity: 1;
+}
+
 /* ============================================
    SCROLLBAR - MATRIX STYLE
    ============================================ */

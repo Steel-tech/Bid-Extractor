@@ -1,0 +1,69 @@
+{
+  "ocr": {
+    "patterns": {
+      "sheetNumber": [
+        "(?:Sheet|Dwg|Drawing)\\s*(?:#|No\\.?|Number)?\\s*([A-Z]+-?\\d+(?:\\.\\d+)?)",
+        "([A-Z]{1,2}-?\\d{2,4}(?:\\.\\d+)?)",
+        "^([A-Z]\\d{3})\\s"
+      ],
+      "projectName": [
+        "(?:Project|Job)\\s*(?:Name)?\\s*:?\\s*(.+?)(?:\\n|$)",
+        "^(.+?)\\s+(?:Sheet|Page|Dwg)"
+      ],
+      "revision": [
+        "(?:Rev\\.?|Revision)\\s*([A-Z0-9]+)",
+        "R(\\d+)"
+      ],
+      "date": [
+        "(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})",
+        "(?:Date|Dated?)\\s*:?\\s*(\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4})",
+        "(\\w+\\s+\\d{1,2},?\\s+\\d{4})"
+      ],
+      "scale": [
+        "(?:Scale)\\s*:?\\s*(\\d+['\"]?\\s*=\\s*\\d+['\"]?-?\\d*['\"]?)",
+        "(1\\s*[:/]\\s*\\d+)",
+        "(\\d+/\\d+['\"]?\\s*=\\s*1['\"]?-?0?['\"]?)"
+      ],
+      "drawnBy": [
+        "(?:Drawn|Drafted|By)\\s*:?\\s*([A-Z]{2,4})",
+        "(?:Author|Designer)\\s*:?\\s*(.+?)(?:\\n|$)"
+      ]
+    },
+    "titleBlockRegions": [
+      { "name": "bottom-right", "x": 0.65, "y": 0.85, "width": 0.35, "height": 0.15 },
+      { "name": "bottom-center", "x": 0.25, "y": 0.90, "width": 0.50, "height": 0.10 },
+      { "name": "right-side", "x": 0.85, "y": 0.50, "width": 0.15, "height": 0.50 }
+    ]
+  },
+  "naming": {
+    "defaultPattern": "{project}_{sheet}_{rev}",
+    "variables": {
+      "project": "Project name from OCR",
+      "sheet": "Sheet number (e.g., A-101)",
+      "rev": "Revision number/letter",
+      "date": "Drawing date",
+      "scale": "Drawing scale"
+    },
+    "sanitization": {
+      "replaceSpaces": "_",
+      "removeChars": "<>:\"/\\|?*",
+      "maxLength": 100
+    }
+  },
+  "annotations": {
+    "defaultColors": {
+      "highlight": "#FFFF00",
+      "text": "#00FF00",
+      "rectangle": "#FF0000",
+      "arrow": "#0066FF"
+    },
+    "strokeWidth": 2,
+    "fontSize": 14,
+    "fontFamily": "Arial, sans-serif"
+  },
+  "viewer": {
+    "defaultZoom": "page-fit",
+    "zoomLevels": [0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0],
+    "thumbnailWidth": 120
+  }
+}

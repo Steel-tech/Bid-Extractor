@@ -1,10 +1,10 @@
-# 🔥 Bid Extractor v1.3.0 - Matrix Edition
+# 🔥 Bid Extractor v1.4.0 - Blueprint Edition
 
-> **Extract bid information from RFQ emails with style.** Matrix-themed Chrome extension with priority scoring, dashboard stats, and digital rain animation.
+> **Extract bid information from RFQ emails with style.** Matrix-themed Chrome extension with priority scoring, dashboard stats, digital rain animation, and **Blueprint Viewer with OCR**.
 
-![Version](https://img.shields.io/badge/version-1.3.0-00ff00?style=flat-square)
+![Version](https://img.shields.io/badge/version-1.4.0-00ff00?style=flat-square)
 ![Chrome](https://img.shields.io/badge/chrome-extension-00ff00?style=flat-square)
-![License](https://img.shields.io/badge/license-proprietary-00ff00?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-00ff00?style=flat-square)
 
 ---
 
@@ -13,9 +13,11 @@
 - [Features](#-features)
 - [Installation](#-installation)
 - [How to Use](#-how-to-use)
+- [Blueprint Viewer](#-blueprint-viewer)
 - [Priority Scoring](#-priority-scoring)
 - [Supported Platforms](#-supported-platforms)
 - [Settings](#-settings)
+- [API Keys & Security](#-api-keys--security)
 - [Troubleshooting](#-troubleshooting)
 - [Credits](#-credits)
 
@@ -34,6 +36,12 @@
 - **Priority Scoring** - Smart 0-100 scoring system for bid prioritization
 - **Dashboard Stats** - Real-time counters for Due Today, This Week, High Priority
 - **Neon Cyberpunk Theme** - Full Matrix green aesthetic with glow effects
+
+### Blueprint Edition (v1.4.0)
+- **Blueprint Viewer** - Full PDF viewer with zoom, rotation, thumbnails
+- **OCR Extraction** - Extract title block data using Google Cloud Vision
+- **Annotations** - Add highlights, text notes, rectangles, arrows to PDFs
+- **Auto-Rename** - Rename blueprints based on extracted sheet numbers
 
 ---
 
@@ -148,6 +156,51 @@ Bids/
 
 ---
 
+## 📐 Blueprint Viewer
+
+The Blueprint Viewer lets you view, annotate, and extract data from PDF blueprints.
+
+### Opening Blueprints
+
+1. **Extract a bid** from an email with PDF attachments
+2. In the popup, scroll to the **"Blueprints"** section
+3. Click on any PDF to open it in the viewer
+
+### Viewer Features
+
+| Feature | Description | Shortcut |
+|---------|-------------|----------|
+| **Navigation** | Page prev/next, thumbnails | ← → |
+| **Zoom** | Fit page, fit width, 50%-300% | + - |
+| **Rotation** | Rotate 90° left/right | - |
+| **Extract Data** | OCR title block extraction | - |
+| **Annotations** | Highlight, text, rectangle, arrow | H T R A |
+
+### OCR Title Block Extraction
+
+Click **"Extract Data"** to automatically read:
+- Project Name
+- Sheet Number (e.g., A-101, S-200)
+- Revision
+- Date
+- Scale
+- Drawn By
+
+**Requires:** Google Cloud Vision API key (see [API Keys & Security](#-api-keys--security))
+
+### Annotations
+
+| Tool | Description |
+|------|-------------|
+| **Highlight** | Yellow semi-transparent rectangle |
+| **Text Note** | Add comments with marker icon |
+| **Rectangle** | Draw outline boxes |
+| **Arrow** | Point to specific areas |
+
+Annotations are saved automatically per PDF.
+
+---
+
 ## 🎯 Priority Scoring
 
 The extension calculates a **priority score (0-100)** for each bid to help you focus on what matters most.
@@ -230,6 +283,55 @@ Available variables:
 
 ---
 
+## 🔐 API Keys & Security
+
+### Google Cloud Vision API Key (Optional)
+
+The OCR feature requires a Google Cloud Vision API key. **This is optional** - the extension works fully without it, you just won't have OCR extraction.
+
+#### Getting an API Key
+
+1. Go to [Google Cloud Console](https://console.cloud.google.com)
+2. Create a new project (or select existing)
+3. Enable the **Cloud Vision API**
+4. Go to **Credentials** → **Create Credentials** → **API Key**
+5. Copy your new key
+
+#### Adding Your API Key
+
+1. Open the Bid Extractor popup
+2. Click the **settings gear** ⚙️ (bottom left)
+3. Scroll to **"Blueprint Settings"**
+4. Paste your key in the **"google vision api key"** field
+5. Click **"save settings"**
+
+#### Cost
+
+- **Free tier:** 1,000 images/month
+- **After free tier:** ~$1.50 per 1,000 images
+
+### ⚠️ Security Best Practices
+
+| ✅ DO | ❌ DON'T |
+|-------|----------|
+| Add API keys through the Settings UI | Commit API keys to code or git |
+| Store keys in Chrome's secure storage | Share keys in issues or chat |
+| Regenerate keys if exposed | Use keys without restrictions |
+| Restrict keys to specific APIs | Leave keys unrestricted |
+
+**If you accidentally expose a key:**
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Delete or regenerate the compromised key immediately
+3. Create a new key with proper restrictions
+
+### Key Restrictions (Recommended)
+
+In Google Cloud Console, restrict your API key:
+- **API restrictions:** Cloud Vision API only
+- **Application restrictions:** None (for browser extension)
+
+---
+
 ## 🔧 Troubleshooting
 
 ### Common Issues
@@ -283,8 +385,22 @@ bid-extractor/
 └── src/
     ├── popup/                 # Main popup interface
     │   ├── popup.html         # HTML structure + stats dashboard
-    │   ├── popup.css          # Matrix theme (996 lines of cyberpunk)
+    │   ├── popup.css          # Matrix theme styling
     │   └── popup.js           # Logic, animations, priority scoring
+    ├── blueprint/             # Blueprint Viewer (v1.4.0)
+    │   ├── viewer.html        # PDF viewer page
+    │   ├── viewer.css         # Viewer Matrix theme
+    │   ├── viewer.js          # PDF rendering, navigation
+    │   ├── annotations.js     # Canvas-based annotations
+    │   └── ocr-service.js     # Google Vision API integration
+    ├── lib/                   # External libraries
+    │   ├── pdf.min.js         # Mozilla PDF.js
+    │   └── pdf.worker.min.js  # PDF.js worker
+    ├── config/                # Configuration files
+    │   ├── blueprint-settings.json
+    │   ├── gc-list.json
+    │   ├── keywords.json
+    │   └── priority-weights.json
     ├── content/               # Page injection scripts
     │   ├── gmail.js           # Gmail email extraction
     │   ├── outlook.js         # Outlook email extraction
@@ -301,7 +417,17 @@ bid-extractor/
 
 ## 🔄 Version History
 
-### v1.3.0 - Matrix Edition (Current)
+### v1.4.0 - Blueprint Edition (Current)
+- ✨ **Blueprint Viewer** - Full PDF viewer in new tab
+- ✨ **OCR Extraction** - Extract title block data (Google Cloud Vision)
+- ✨ **Annotations** - Highlight, text notes, rectangles, arrows
+- ✨ **Auto-Rename** - Rename PDFs based on extracted metadata
+- ✨ Blueprint settings in popup (naming pattern, API key)
+- ✨ PDF thumbnails sidebar
+- ✨ Keyboard shortcuts for viewer
+- 🔐 Secure API key storage (Chrome sync)
+
+### v1.3.0 - Matrix Edition
 - ✨ Full Matrix cyberpunk theme redesign
 - ✨ Digital rain background animation
 - ✨ Priority scoring system (0-100)

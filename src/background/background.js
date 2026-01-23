@@ -38,10 +38,56 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
       return true;
 
+    // Blueprint-related actions
+    case 'openBlueprintViewer':
+      openBlueprintViewer(request.url, request.filename);
+      sendResponse({ success: true });
+      return true;
+
+    case 'saveBlueprintAnnotations':
+      saveBlueprintAnnotations(request.fileHash, request.annotations)
+        .then(() => sendResponse({ success: true }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
+    case 'getBlueprintAnnotations':
+      getBlueprintAnnotations(request.fileHash)
+        .then(data => sendResponse({ success: true, data }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     default:
       break;
   }
 });
+
+// ===== BLUEPRINT FUNCTIONS =====
+
+// Open blueprint viewer in a new tab
+function openBlueprintViewer(url, filename) {
+  const viewerUrl = chrome.runtime.getURL('src/blueprint/viewer.html');
+  const params = new URLSearchParams({
+    file: encodeURIComponent(url),
+    name: encodeURIComponent(filename || 'blueprint.pdf')
+  });
+
+  chrome.tabs.create({
+    url: `${viewerUrl}?${params.toString()}`
+  });
+}
+
+// Save blueprint annotations to storage
+async function saveBlueprintAnnotations(fileHash, annotations) {
+  const key = `blueprint_annotations_${fileHash}`;
+  await chrome.storage.local.set({ [key]: annotations });
+}
+
+// Get blueprint annotations from storage
+async function getBlueprintAnnotations(fileHash) {
+  const key = `blueprint_annotations_${fileHash}`;
+  const data = await chrome.storage.local.get(key);
+  return data[key] || [];
+}
 
 // Handle selector error for monitoring
 function handleSelectorError(error, sender) {

@@ -578,6 +578,80 @@ function displayExtraction(data) {
 
   // Display download links
   displayDownloadLinks(data.downloadLinks || []);
+
+  // Display blueprints (PDF attachments)
+  displayBlueprints(data.attachments || []);
+}
+
+// Display blueprints (PDF attachments)
+function displayBlueprints(attachments) {
+  const blueprintSection = document.getElementById('blueprint-section');
+  const blueprintList = document.getElementById('blueprint-list');
+
+  if (!blueprintSection || !blueprintList) return;
+
+  // Filter for PDF files
+  const blueprints = (attachments || []).filter(att =>
+    att.name?.toLowerCase().endsWith('.pdf') ||
+    att.type?.includes('pdf')
+  );
+
+  if (blueprints.length === 0) {
+    blueprintSection.classList.add('hidden');
+    return;
+  }
+
+  blueprintSection.classList.remove('hidden');
+  blueprintList.innerHTML = '';
+
+  blueprints.forEach((blueprint, index) => {
+    const item = document.createElement('div');
+    item.className = 'blueprint-item';
+    item.innerHTML = `
+      <span class="blueprint-icon">\uD83D\uDDC2</span>
+      <div class="blueprint-info">
+        <div class="blueprint-name">${escapeHtml(blueprint.name)}</div>
+        <div class="blueprint-size">${blueprint.size ? formatFileSize(blueprint.size) : 'PDF'}</div>
+      </div>
+      <span class="blueprint-action">View \u2192</span>
+    `;
+
+    item.addEventListener('click', () => {
+      openBlueprintViewer(blueprint.url, blueprint.name);
+    });
+
+    blueprintList.appendChild(item);
+  });
+}
+
+// Open blueprint in viewer
+function openBlueprintViewer(url, name) {
+  const viewerUrl = chrome.runtime.getURL('src/blueprint/viewer.html');
+  const params = new URLSearchParams({
+    file: encodeURIComponent(url),
+    name: encodeURIComponent(name)
+  });
+
+  chrome.tabs.create({
+    url: `${viewerUrl}?${params.toString()}`
+  });
+
+  showToast('Opening blueprint viewer...', 'info', 2000);
+}
+
+// Format file size
+function formatFileSize(bytes) {
+  if (!bytes) return '';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let size = bytes;
+  let unitIndex = 0;
+
+  while (size >= 1024 && unitIndex < units.length - 1) {
+    size /= 1024;
+    unitIndex++;
+  }
+
+  return `${size.toFixed(1)} ${units[unitIndex]}`;
 }
 
 // Display download links from bid portals
@@ -1137,12 +1211,25 @@ saveSettings.addEventListener('click', async () => {
   const autoDownload = document.getElementById('auto-download').checked;
   const createSummary = document.getElementById('create-summary').checked;
 
+  // Blueprint settings
+  const blueprintNaming = document.getElementById('blueprint-naming')?.value || '{project}_{sheet}_{rev}';
+  const autoRenameBlueprint = document.getElementById('auto-rename-blueprint')?.checked || false;
+  const visionApiKey = document.getElementById('vision-api-key')?.value || '';
+
   try {
+    // Save local settings
     await chrome.storage.local.set({
       folderPattern,
       autoDownload,
-      createSummary
+      createSummary,
+      blueprintNaming,
+      autoRenameBlueprint
     });
+
+    // Save API key to sync storage (encrypted/secure)
+    if (visionApiKey) {
+      await chrome.storage.sync.set({ googleVisionApiKey: visionApiKey });
+    }
 
     settingsModal.classList.add('hidden');
     showToast('Settings saved', 'success', 2000);
@@ -1153,12 +1240,34 @@ saveSettings.addEventListener('click', async () => {
 });
 
 async function loadSettings() {
-  const settings = await chrome.storage.local.get(['folderPattern', 'autoDownload', 'createSummary']);
+  const settings = await chrome.storage.local.get([
+    'folderPattern',
+    'autoDownload',
+    'createSummary',
+    'blueprintNaming',
+    'autoRenameBlueprint'
+  ]);
+  const syncSettings = await chrome.storage.sync.get(['googleVisionApiKey']);
 
   // Default: GC Name + Bid Date + Project (Company first, then date)
   document.getElementById('folder-pattern').value = settings.folderPattern || 'Bids/{gc}_{date}_{project}';
   document.getElementById('auto-download').checked = settings.autoDownload !== false;
   document.getElementById('create-summary').checked = settings.createSummary !== false;
+
+  // Blueprint settings
+  const blueprintNamingEl = document.getElementById('blueprint-naming');
+  const autoRenameBlueprintEl = document.getElementById('auto-rename-blueprint');
+  const visionApiKeyEl = document.getElementById('vision-api-key');
+
+  if (blueprintNamingEl) {
+    blueprintNamingEl.value = settings.blueprintNaming || '{project}_{sheet}_{rev}';
+  }
+  if (autoRenameBlueprintEl) {
+    autoRenameBlueprintEl.checked = settings.autoRenameBlueprint || false;
+  }
+  if (visionApiKeyEl && syncSettings.googleVisionApiKey) {
+    visionApiKeyEl.value = syncSettings.googleVisionApiKey;
+  }
 }
 
 // Close modal on outside click
