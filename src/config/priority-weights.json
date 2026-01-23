@@ -1,0 +1,45 @@
+{
+  "description": "Priority scoring weights for bid urgency calculation",
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-23",
+  "maxScore": 100,
+  "weights": {
+    "deadline": {
+      "maxPoints": 40,
+      "tiers": [
+        { "daysUntil": 0, "points": 40, "label": "Due today or overdue" },
+        { "daysUntil": 1, "points": 38, "label": "Tomorrow" },
+        { "daysUntil": 2, "points": 35, "label": "2 days" },
+        { "daysUntil": 3, "points": 32, "label": "3 days" },
+        { "daysUntil": 5, "points": 28, "label": "5 days" },
+        { "daysUntil": 7, "points": 25, "label": "This week" },
+        { "daysUntil": 14, "points": 15, "label": "Two weeks" },
+        { "daysUntil": 30, "points": 10, "label": "Month out" },
+        { "daysUntil": null, "points": 5, "label": "Far out" }
+      ]
+    },
+    "gcReputation": {
+      "maxPoints": 20,
+      "majorGcPoints": 20,
+      "knownGcPoints": 10
+    },
+    "projectValue": {
+      "maxPoints": 20,
+      "pointsPerKeyword": 5
+    },
+    "dataCompleteness": {
+      "maxPoints": 10,
+      "pointsPerField": 1.5,
+      "fields": ["project", "gc", "bidDate", "location", "scope", "contact", "email"]
+    },
+    "attachments": {
+      "maxPoints": 10,
+      "pointsPerAttachment": 2
+    }
+  },
+  "priorityLevels": {
+    "high": { "minScore": 70, "label": "HIGH" },
+    "medium": { "minScore": 40, "label": "MED" },
+    "low": { "minScore": 0, "label": "LOW" }
+  }
+}

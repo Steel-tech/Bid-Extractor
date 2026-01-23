@@ -41,7 +41,7 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["src/content/gmail.js"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/gmail.js"],
       "css": ["src/content/content.css"]
     },
     {
@@ -51,7 +51,7 @@
         "https://outlook.office365.com/*",
         "https://*.outlook.com/*"
       ],
-      "js": ["src/content/outlook.js"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/outlook.js"],
       "css": ["src/content/content.css"]
     },
     {
@@ -59,15 +59,34 @@
         "https://*.buildingconnected.com/*",
         "https://app.buildingconnected.com/*"
       ],
-      "js": ["src/content/platforms/buildingconnected.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/buildingconnected.js"]
     },
     {
       "matches": ["https://*.planhub.com/*"],
-      "js": ["src/content/platforms/planhub.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/planhub.js"]
     },
     {
       "matches": ["https://*.procore.com/*"],
-      "js": ["src/content/platforms/procore.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/procore.js"]
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "src/config/*.json",
+        "src/utils/*.js"
+      ],
+      "matches": [
+        "https://mail.google.com/*",
+        "https://outlook.live.com/*",
+        "https://outlook.office.com/*",
+        "https://outlook.office365.com/*",
+        "https://*.outlook.com/*",
+        "https://*.buildingconnected.com/*",
+        "https://app.buildingconnected.com/*",
+        "https://*.planhub.com/*",
+        "https://*.procore.com/*"
+      ]
     }
   ]
 }

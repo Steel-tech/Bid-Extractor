@@ -1,0 +1,99 @@
+{
+  "description": "DOM selectors for email extraction per platform",
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-23",
+  "gmail": {
+    "container": {
+      "primary": "[role=\"main\"]",
+      "fallback": "body"
+    },
+    "body": [
+      ".a3s.aiL",
+      ".a3s",
+      ".ii.gt",
+      "[data-message-id]",
+      ".gmail_quote",
+      "div[dir=\"ltr\"]",
+      ".Am.aiL",
+      ".Am"
+    ],
+    "bodyFallback": [
+      ".a3s.aiL",
+      ".a3s",
+      ".gs .ii.gt",
+      "[role=\"listitem\"] .a3s",
+      ".nH .a3s"
+    ],
+    "subject": [
+      "h2[data-thread-perm-id]",
+      "[data-thread-perm-id] span",
+      ".hP"
+    ],
+    "sender": [
+      ".gD",
+      "[email]"
+    ],
+    "attachments": [
+      ".aQH",
+      ".aZo",
+      "[download_url]"
+    ],
+    "attachmentName": [
+      ".aV3",
+      ".aQA"
+    ],
+    "toolbar": ".G-atb",
+    "emailOpenIndicator": [
+      ".a3s.aiL",
+      "[data-message-id]"
+    ]
+  },
+  "outlook": {
+    "container": [
+      "[role=\"main\"]",
+      ".ReadingPaneContents",
+      "[data-app-section=\"ReadingPane\"]",
+      ".customScrollBar",
+      "[class*=\"ReadingPane\"]",
+      "[class*=\"readingPane\"]",
+      "#ReadingPaneContainerId",
+      "[data-testid=\"reading-pane\"]"
+    ],
+    "body": [
+      "[aria-label*=\"Message body\"]",
+      "[aria-label*=\"message body\"]",
+      "[id*=\"UniqueMessageBody\"]",
+      ".allowTextSelection",
+      "[class*=\"messageBody\"]",
+      "[class*=\"MessageBody\"]",
+      "[data-testid=\"message-body\"]",
+      "div[dir=\"ltr\"][class*=\"body\"]",
+      ".rps_8d7c",
+      "div[style*=\"font-family\"]",
+      "[role=\"document\"]"
+    ],
+    "subject": [
+      "[aria-label*=\"Subject\"]",
+      ".rps_8d7f",
+      "span[title][role=\"heading\"]"
+    ],
+    "sender": [
+      "[aria-label*=\"From\"]",
+      ".rps_8d70",
+      "[autoid*=\"PersonaCard\"]"
+    ],
+    "attachments": [
+      "[aria-label*=\"Attachment\"]",
+      "[data-testid*=\"attachment\"]",
+      ".rps_8d7a"
+    ],
+    "toolbar": [
+      "[role=\"toolbar\"]",
+      ".rps_8d7h"
+    ],
+    "emailOpenIndicator": [
+      "[aria-label*=\"Message body\"]",
+      "[id*=\"UniqueMessageBody\"]"
+    ]
+  }
+}

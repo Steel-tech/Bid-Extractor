@@ -1,0 +1,57 @@
+{
+  "compilerOptions": {
+    // Allow JS files alongside TS for incremental migration
+    "allowJs": true,
+    "checkJs": true,
+
+    // Don't emit - just type check
+    "noEmit": true,
+
+    // Target ES2020 (modern browsers, Chrome extension environment)
+    "target": "ES2020",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ES2020",
+    "moduleResolution": "node",
+
+    // Strict type checking
+    "strict": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "noImplicitAny": false, // Start permissive, enable later
+    "noImplicitThis": true,
+
+    // Additional checks
+    "noUnusedLocals": false, // Enable later
+    "noUnusedParameters": false, // Enable later
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+
+    // Module interop
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    // Type declaration files
+    "types": ["chrome"],
+
+    // Skip node_modules
+    "skipLibCheck": true,
+
+    // Resolve paths
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.js",
+    "src/types/**/*.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "src/__tests__/**/*",
+    "jest.setup.js"
+  ]
+}

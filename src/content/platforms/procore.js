@@ -1,3 +1,4 @@
+// @ts-nocheck
 // Procore Content Script - Document Extractor
 // Extracts and downloads bid documents from Procore project pages
 

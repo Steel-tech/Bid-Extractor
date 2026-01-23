@@ -1,0 +1,29 @@
+{
+  "description": "Major general contractors that get priority scoring",
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-23",
+  "contractors": [
+    "turner",
+    "skanska",
+    "mortenson",
+    "mccarthy",
+    "holder",
+    "whiting-turner",
+    "hensel phelps",
+    "beck",
+    "barton malow",
+    "gilbane",
+    "brasfield gorrie",
+    "jll",
+    "cbre",
+    "webcor",
+    "swinerton",
+    "hitt",
+    "clark construction",
+    "suffolk",
+    "walsh",
+    "austin industries",
+    "ryan companies",
+    "hoar"
+  ]
+}

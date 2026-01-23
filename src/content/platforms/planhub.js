@@ -1,3 +1,4 @@
+// @ts-nocheck
 // PlanHub Content Script - Document Extractor
 // Extracts and downloads bid documents from PlanHub project pages
 

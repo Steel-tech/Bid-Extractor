@@ -1,4 +1,30 @@
+// @ts-nocheck
 // Gmail Content Script for Bid Extractor
+// TODO: Enable type checking after incremental migration
+
+// Config storage (loaded on init)
+let SELECTORS = null;
+let PLATFORMS = null;
+
+// Load configs on script init
+(async function initConfigs() {
+  try {
+    const [selectorsConfig, platformsConfig] = await Promise.all([
+      fetch(chrome.runtime.getURL('src/config/selectors.json')).then(r => r.json()),
+      fetch(chrome.runtime.getURL('src/config/platforms.json')).then(r => r.json())
+    ]);
+    SELECTORS = selectorsConfig.gmail;
+    PLATFORMS = {
+      ...platformsConfig.bidPlatforms,
+      ...platformsConfig.fileSharingServices,
+      ...platformsConfig.drawingServices,
+      ...platformsConfig.cloudStorage
+    };
+    console.log('Bid Extractor: Gmail configs loaded');
+  } catch (error) {
+    console.warn('Bid Extractor: Failed to load configs, using defaults:', error);
+  }
+})();
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -14,26 +40,31 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function extractBidInfo() {
   console.log('Bid Extractor: Starting extraction...');
 
+  // Get selectors from config or use defaults
+  const containerSelector = SELECTORS?.container?.primary || '[role="main"]';
+  const bodySelectors = SELECTORS?.body || [
+    '.a3s.aiL', '.a3s', '.ii.gt', '[data-message-id]',
+    '.gmail_quote', 'div[dir="ltr"]', '.Am.aiL', '.Am'
+  ];
+  const fallbackSelectors = SELECTORS?.bodyFallback || [
+    '.a3s.aiL', '.a3s', '.gs .ii.gt', '[role="listitem"] .a3s', '.nH .a3s'
+  ];
+
   // Multiple strategies to find email content
   let emailBody = null;
   let emailContainer = null;
 
-  // Strategy 1: Find by role="main" and common Gmail classes
-  emailContainer = document.querySelector('[role="main"]');
+  // Strategy 1: Find container and body using SafeQuery
+  emailContainer = document.querySelector(containerSelector);
 
-  if (emailContainer) {
-    // Try multiple selectors for the email body
-    const bodySelectors = [
-      '.a3s.aiL',           // Classic Gmail
-      '.a3s',               // Gmail body class
-      '.ii.gt',             // Another Gmail body
-      '[data-message-id]',  // Message container
-      '.gmail_quote',       // Quoted content (means email is there)
-      'div[dir="ltr"]',     // LTR text container
-      '.Am.aiL',            // Another variant
-      '.Am',                // Message body
-    ];
-
+  if (emailContainer && window.SafeQuery) {
+    emailBody = SafeQuery.query(bodySelectors, emailContainer, {
+      name: 'gmail-email-body',
+      minTextLength: 10,
+      silent: true // We have fallbacks
+    });
+  } else if (emailContainer) {
+    // Fallback if SafeQuery not loaded
     for (const selector of bodySelectors) {
       emailBody = emailContainer.querySelector(selector);
       if (emailBody && emailBody.innerText?.trim().length > 10) {
@@ -45,19 +76,19 @@ async function extractBidInfo() {
 
   // Strategy 2: Look for email content anywhere in the page
   if (!emailBody) {
-    const fallbackSelectors = [
-      '.a3s.aiL',
-      '.a3s',
-      '.gs .ii.gt',
-      '[role="listitem"] .a3s',
-      '.nH .a3s'
-    ];
-
-    for (const selector of fallbackSelectors) {
-      emailBody = document.querySelector(selector);
-      if (emailBody && emailBody.innerText?.trim().length > 10) {
-        console.log('Found email body with fallback selector:', selector);
-        break;
+    if (window.SafeQuery) {
+      emailBody = SafeQuery.query(fallbackSelectors, document, {
+        name: 'gmail-email-body-fallback',
+        minTextLength: 10,
+        silent: true
+      });
+    } else {
+      for (const selector of fallbackSelectors) {
+        emailBody = document.querySelector(selector);
+        if (emailBody && emailBody.innerText?.trim().length > 10) {
+          console.log('Found email body with fallback selector:', selector);
+          break;
+        }
       }
     }
   }
@@ -68,7 +99,6 @@ async function extractBidInfo() {
     for (const div of allDivs) {
       const text = div.innerText?.trim() || '';
       if (text.length > 100 && !div.querySelector('div[innerText]')) {
-        // Found a div with substantial content
         emailBody = div;
         console.log('Found email body via text content search');
         break;
@@ -77,8 +107,10 @@ async function extractBidInfo() {
   }
 
   if (!emailBody) {
-    console.log('Could not find email body. Available classes:',
-      Array.from(document.querySelectorAll('[class]')).slice(0, 20).map(el => el.className));
+    // Report failure with SafeQuery if available
+    if (window.SafeQuery) {
+      SafeQuery.reportFailure('gmail-email-body-all-strategies', [...bodySelectors, ...fallbackSelectors], document);
+    }
     throw new Error('Could not find email content - try refreshing the page');
   }
 
@@ -87,15 +119,22 @@ async function extractBidInfo() {
   const emailText = emailBody.innerText || '';
   const emailHtml = emailBody.innerHTML || '';
 
-  // Get email subject
-  const subjectEl = document.querySelector('h2[data-thread-perm-id]') ||
-                    document.querySelector('[data-thread-perm-id] span') ||
-                    document.querySelector('.hP');
+  // Get email subject using config selectors
+  const subjectSelectors = SELECTORS?.subject || ['h2[data-thread-perm-id]', '[data-thread-perm-id] span', '.hP'];
+  let subjectEl = null;
+  for (const sel of subjectSelectors) {
+    subjectEl = document.querySelector(sel);
+    if (subjectEl) break;
+  }
   const subject = subjectEl?.innerText || '';
 
-  // Get sender info
-  const senderEl = document.querySelector('.gD') ||
-                   document.querySelector('[email]');
+  // Get sender info using config selectors
+  const senderSelectors = SELECTORS?.sender || ['.gD', '[email]'];
+  let senderEl = null;
+  for (const sel of senderSelectors) {
+    senderEl = document.querySelector(sel);
+    if (senderEl) break;
+  }
   const senderEmail = senderEl?.getAttribute('email') || '';
   const senderName = senderEl?.getAttribute('name') || senderEl?.innerText || '';
 
@@ -326,9 +365,8 @@ function extractDownloadLinks(emailBody) {
   const links = [];
   const allLinks = emailBody.querySelectorAll('a[href]');
 
-  // Define bid platforms and file sharing services
-  const platforms = {
-    // Bid Management Platforms
+  // Use platforms from config or fallback to defaults
+  const platforms = PLATFORMS || {
     'buildingconnected.com': { name: 'BuildingConnected', icon: '🏗️' },
     'planhub.com': { name: 'PlanHub', icon: '📐' },
     'isqft.com': { name: 'iSqFt', icon: '📊' },
@@ -340,8 +378,6 @@ function extractDownloadLinks(emailBody) {
     'bluebeam.com': { name: 'Bluebeam', icon: '🔵' },
     'pipelinesuite.com': { name: 'Pipeline Suite', icon: '🔧' },
     'e-builder.net': { name: 'e-Builder', icon: '🏢' },
-
-    // File Sharing Services
     'dropbox.com': { name: 'Dropbox', icon: '📦' },
     'box.com': { name: 'Box', icon: '📁' },
     'drive.google.com': { name: 'Google Drive', icon: '🔷' },
@@ -354,13 +390,9 @@ function extractDownloadLinks(emailBody) {
     'we.tl': { name: 'WeTransfer', icon: '📨' },
     'hightail.com': { name: 'Hightail', icon: '✈️' },
     'egnyte.com': { name: 'Egnyte', icon: '📊' },
-
-    // Drawing/Plan Services
     'planswift.com': { name: 'PlanSwift', icon: '📏' },
     'onscreentakeoff.com': { name: 'On-Screen Takeoff', icon: '📐' },
     'bluebeamcloud.com': { name: 'Bluebeam Cloud', icon: '🔵' },
-
-    // General file links
     'amazonaws.com': { name: 'AWS Download', icon: '☁️' },
     'blob.core.windows.net': { name: 'Azure Storage', icon: '☁️' },
   };

@@ -1,4 +1,10 @@
+// @ts-nocheck
 // Background Service Worker for Bid Extractor
+// TODO: Enable type checking after incremental migration
+
+// Selector error tracking
+const selectorErrors = [];
+const MAX_SELECTOR_ERRORS = 100;
 
 // Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -19,10 +25,73 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       getRecentBids().then(sendResponse);
       return true;
 
+    case 'selectorError':
+      handleSelectorError(request.error, sender);
+      break;
+
+    case 'getSelectorErrors':
+      sendResponse({ errors: selectorErrors });
+      return true;
+
+    case 'clearSelectorErrors':
+      selectorErrors.length = 0;
+      sendResponse({ success: true });
+      return true;
+
     default:
       break;
   }
 });
+
+// Handle selector error for monitoring
+function handleSelectorError(error, sender) {
+  // Add tab info
+  const enrichedError = {
+    ...error,
+    tabId: sender.tab?.id,
+    tabUrl: sender.tab?.url,
+    receivedAt: new Date().toISOString()
+  };
+
+  selectorErrors.push(enrichedError);
+
+  // Keep limited history
+  if (selectorErrors.length > MAX_SELECTOR_ERRORS) {
+    selectorErrors.shift();
+  }
+
+  // Log for debugging
+  console.warn('Selector failure:', enrichedError.name, enrichedError.selectors);
+
+  // Optionally save to storage for persistence across restarts
+  saveSelectorErrors();
+}
+
+// Save selector errors to storage (async, fire-and-forget)
+async function saveSelectorErrors() {
+  try {
+    await chrome.storage.local.set({
+      selectorErrors: selectorErrors.slice(-50) // Keep last 50 in storage
+    });
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
+// Load selector errors on startup
+async function loadSelectorErrors() {
+  try {
+    const data = await chrome.storage.local.get('selectorErrors');
+    if (data.selectorErrors) {
+      selectorErrors.push(...data.selectorErrors);
+    }
+  } catch (e) {
+    // Ignore storage errors
+  }
+}
+
+// Load errors on startup
+loadSelectorErrors();
 
 // Handle newly extracted bid
 async function handleBidExtracted(bidData) {

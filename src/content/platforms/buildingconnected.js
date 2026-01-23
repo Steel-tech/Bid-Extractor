@@ -1,3 +1,4 @@
+// @ts-nocheck
 // BuildingConnected Content Script - Document Extractor
 // Extracts and downloads bid documents from BuildingConnected project pages
 

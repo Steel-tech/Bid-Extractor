@@ -1,0 +1,55 @@
+{
+  "description": "Bid platforms and file sharing services for link extraction",
+  "version": "1.0.0",
+  "lastUpdated": "2025-01-23",
+  "bidPlatforms": {
+    "buildingconnected.com": { "name": "BuildingConnected", "icon": "\ud83c\udfd7\ufe0f" },
+    "planhub.com": { "name": "PlanHub", "icon": "\ud83d\udcd0" },
+    "isqft.com": { "name": "iSqFt", "icon": "\ud83d\udcca" },
+    "procore.com": { "name": "Procore", "icon": "\ud83d\udd37" },
+    "smartbidnet.com": { "name": "SmartBid", "icon": "\ud83d\udca1" },
+    "construction.com": { "name": "Dodge/Construction", "icon": "\ud83d\udd36" },
+    "constructconnect.com": { "name": "ConstructConnect", "icon": "\ud83d\udd17" },
+    "plangrid.com": { "name": "PlanGrid", "icon": "\ud83d\udcf1" },
+    "bluebeam.com": { "name": "Bluebeam", "icon": "\ud83d\udd35" },
+    "pipelinesuite.com": { "name": "Pipeline Suite", "icon": "\ud83d\udd27" },
+    "e-builder.net": { "name": "e-Builder", "icon": "\ud83c\udfe2" }
+  },
+  "fileSharingServices": {
+    "dropbox.com": { "name": "Dropbox", "icon": "\ud83d\udce6" },
+    "box.com": { "name": "Box", "icon": "\ud83d\udcc1" },
+    "drive.google.com": { "name": "Google Drive", "icon": "\ud83d\udd37" },
+    "docs.google.com": { "name": "Google Docs", "icon": "\ud83d\udcc4" },
+    "onedrive.live.com": { "name": "OneDrive", "icon": "\u2601\ufe0f" },
+    "sharepoint.com": { "name": "SharePoint", "icon": "\ud83d\udcc2" },
+    "1drv.ms": { "name": "OneDrive", "icon": "\u2601\ufe0f" },
+    "sharefile.com": { "name": "ShareFile", "icon": "\ud83d\udce4" },
+    "wetransfer.com": { "name": "WeTransfer", "icon": "\ud83d\udce8" },
+    "we.tl": { "name": "WeTransfer", "icon": "\ud83d\udce8" },
+    "hightail.com": { "name": "Hightail", "icon": "\u2708\ufe0f" },
+    "egnyte.com": { "name": "Egnyte", "icon": "\ud83d\udcca" }
+  },
+  "drawingServices": {
+    "planswift.com": { "name": "PlanSwift", "icon": "\ud83d\udccf" },
+    "onscreentakeoff.com": { "name": "On-Screen Takeoff", "icon": "\ud83d\udcd0" },
+    "bluebeamcloud.com": { "name": "Bluebeam Cloud", "icon": "\ud83d\udd35" }
+  },
+  "cloudStorage": {
+    "amazonaws.com": { "name": "AWS Download", "icon": "\u2601\ufe0f" },
+    "blob.core.windows.net": { "name": "Azure Storage", "icon": "\u2601\ufe0f" }
+  },
+  "fileExtensions": [".pdf", ".dwg", ".dxf", ".zip", ".rar", ".xlsx", ".xls", ".doc", ".docx"],
+  "relevantExtensions": [".pdf", ".dwg", ".dxf", ".xlsx", ".xls", ".doc", ".docx", ".zip"],
+  "downloadKeywords": [
+    "download",
+    "view plans",
+    "view drawings",
+    "access documents",
+    "bid documents",
+    "project documents",
+    "click here to view",
+    "specifications",
+    "addendum",
+    "plans and specs"
+  ]
+}

@@ -1,4 +1,30 @@
+// @ts-nocheck
 // Outlook Content Script for Bid Extractor
+// TODO: Enable type checking after incremental migration
+
+// Config storage (loaded on init)
+let SELECTORS = null;
+let PLATFORMS = null;
+
+// Load configs on script init
+(async function initConfigs() {
+  try {
+    const [selectorsConfig, platformsConfig] = await Promise.all([
+      fetch(chrome.runtime.getURL('src/config/selectors.json')).then(r => r.json()),
+      fetch(chrome.runtime.getURL('src/config/platforms.json')).then(r => r.json())
+    ]);
+    SELECTORS = selectorsConfig.outlook;
+    PLATFORMS = {
+      ...platformsConfig.bidPlatforms,
+      ...platformsConfig.fileSharingServices,
+      ...platformsConfig.drawingServices,
+      ...platformsConfig.cloudStorage
+    };
+    console.log('Bid Extractor: Outlook configs loaded');
+  } catch (error) {
+    console.warn('Bid Extractor: Failed to load configs, using defaults:', error);
+  }
+})();
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -14,57 +40,64 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function extractBidInfo() {
   console.log('Bid Extractor: Starting Outlook extraction...');
 
+  // Get selectors from config or use defaults
+  const containerSelectors = SELECTORS?.container || [
+    '[role="main"]', '.ReadingPaneContents', '[data-app-section="ReadingPane"]',
+    '.customScrollBar', '[class*="ReadingPane"]', '[class*="readingPane"]',
+    '#ReadingPaneContainerId', '[data-testid="reading-pane"]'
+  ];
+  const bodySelectors = SELECTORS?.body || [
+    '[aria-label*="Message body"]', '[aria-label*="message body"]',
+    '[id*="UniqueMessageBody"]', '.allowTextSelection', '[class*="messageBody"]',
+    '[class*="MessageBody"]', '[data-testid="message-body"]',
+    'div[dir="ltr"][class*="body"]', '.rps_8d7c', 'div[style*="font-family"]', '[role="document"]'
+  ];
+  const subjectSelectors = SELECTORS?.subject || [
+    '[aria-label*="Subject"]', '.rps_8d7f', 'span[title][role="heading"]'
+  ];
+  const senderSelectors = SELECTORS?.sender || [
+    '[aria-label*="From"]', '.rps_8d70', '[autoid*="PersonaCard"]'
+  ];
+
   // Multiple strategies to find email container
   let emailContainer = null;
   let emailBody = null;
 
-  // Container selectors (try multiple)
-  const containerSelectors = [
-    '[role="main"]',
-    '.ReadingPaneContents',
-    '[data-app-section="ReadingPane"]',
-    '.customScrollBar',
-    '[class*="ReadingPane"]',
-    '[class*="readingPane"]',
-    '#ReadingPaneContainerId',
-    '[data-testid="reading-pane"]'
-  ];
-
-  for (const selector of containerSelectors) {
-    emailContainer = document.querySelector(selector);
-    if (emailContainer) {
-      console.log('Found container with:', selector);
-      break;
+  // Use SafeQuery if available
+  if (window.SafeQuery) {
+    emailContainer = SafeQuery.query(containerSelectors, document, {
+      name: 'outlook-container',
+      silent: true
+    });
+  } else {
+    for (const selector of containerSelectors) {
+      emailContainer = document.querySelector(selector);
+      if (emailContainer) {
+        console.log('Found container with:', selector);
+        break;
+      }
     }
   }
 
   if (!emailContainer) {
-    // Fallback: use body
     emailContainer = document.body;
     console.log('Using body as container');
   }
 
-  // Body selectors (try multiple)
-  const bodySelectors = [
-    '[aria-label*="Message body"]',
-    '[aria-label*="message body"]',
-    '[id*="UniqueMessageBody"]',
-    '.allowTextSelection',
-    '[class*="messageBody"]',
-    '[class*="MessageBody"]',
-    '[data-testid="message-body"]',
-    'div[dir="ltr"][class*="body"]',
-    '.rps_8d7c',
-    // More generic fallbacks
-    'div[style*="font-family"]',
-    '[role="document"]'
-  ];
-
-  for (const selector of bodySelectors) {
-    emailBody = emailContainer.querySelector(selector);
-    if (emailBody && emailBody.innerText?.trim().length > 20) {
-      console.log('Found body with:', selector);
-      break;
+  // Find email body
+  if (window.SafeQuery) {
+    emailBody = SafeQuery.query(bodySelectors, emailContainer, {
+      name: 'outlook-email-body',
+      minTextLength: 20,
+      silent: true
+    });
+  } else {
+    for (const selector of bodySelectors) {
+      emailBody = emailContainer.querySelector(selector);
+      if (emailBody && emailBody.innerText?.trim().length > 20) {
+        console.log('Found body with:', selector);
+        break;
+      }
     }
   }
 
@@ -73,7 +106,6 @@ async function extractBidInfo() {
     const allDivs = emailContainer.querySelectorAll('div');
     for (const div of allDivs) {
       const text = div.innerText?.trim() || '';
-      // Look for email-like content (has @, multiple lines, etc.)
       if (text.length > 100 && (text.includes('@') || text.includes('Dear') || text.includes('Hi ') || text.includes('Hello'))) {
         emailBody = div;
         console.log('Found body via content heuristics');
@@ -83,6 +115,10 @@ async function extractBidInfo() {
   }
 
   if (!emailBody) {
+    // Report failure with SafeQuery if available
+    if (window.SafeQuery) {
+      SafeQuery.reportFailure('outlook-email-body-all-strategies', bodySelectors, emailContainer);
+    }
     throw new Error('Could not find email content - try clicking on the email');
   }
 
@@ -90,16 +126,28 @@ async function extractBidInfo() {
 
   const emailText = emailBody.innerText || '';
 
-  // Get subject
-  const subjectEl = document.querySelector('[aria-label*="Subject"]') ||
-                    document.querySelector('.rps_8d7f') ||
-                    document.querySelector('span[title][role="heading"]');
+  // Get subject using SafeQuery or fallback
+  let subjectEl = window.SafeQuery
+    ? SafeQuery.query(subjectSelectors, document, { name: 'outlook-subject', silent: true })
+    : null;
+  if (!subjectEl) {
+    for (const sel of subjectSelectors) {
+      subjectEl = document.querySelector(sel);
+      if (subjectEl) break;
+    }
+  }
   const subject = subjectEl?.innerText || subjectEl?.getAttribute('title') || '';
 
-  // Get sender
-  const senderEl = document.querySelector('[aria-label*="From"]') ||
-                   document.querySelector('.rps_8d70') ||
-                   document.querySelector('[autoid*="PersonaCard"]');
+  // Get sender using SafeQuery or fallback
+  let senderEl = window.SafeQuery
+    ? SafeQuery.query(senderSelectors, document, { name: 'outlook-sender', silent: true })
+    : null;
+  if (!senderEl) {
+    for (const sel of senderSelectors) {
+      senderEl = document.querySelector(sel);
+      if (senderEl) break;
+    }
+  }
   const senderName = senderEl?.innerText?.split('\n')[0] || '';
   const senderEmail = extractEmailFromText(senderEl?.innerText || '') || '';
 
@@ -298,9 +346,8 @@ function extractDownloadLinks(emailBody) {
   const links = [];
   const allLinks = emailBody.querySelectorAll('a[href]');
 
-  // Define bid platforms and file sharing services
-  const platforms = {
-    // Bid Management Platforms
+  // Use platforms from config or fallback to defaults
+  const platforms = PLATFORMS || {
     'buildingconnected.com': { name: 'BuildingConnected', icon: '🏗️' },
     'planhub.com': { name: 'PlanHub', icon: '📐' },
     'isqft.com': { name: 'iSqFt', icon: '📊' },
@@ -312,8 +359,6 @@ function extractDownloadLinks(emailBody) {
     'bluebeam.com': { name: 'Bluebeam', icon: '🔵' },
     'pipelinesuite.com': { name: 'Pipeline Suite', icon: '🔧' },
     'e-builder.net': { name: 'e-Builder', icon: '🏢' },
-
-    // File Sharing Services
     'dropbox.com': { name: 'Dropbox', icon: '📦' },
     'box.com': { name: 'Box', icon: '📁' },
     'drive.google.com': { name: 'Google Drive', icon: '🔷' },
@@ -326,13 +371,9 @@ function extractDownloadLinks(emailBody) {
     'we.tl': { name: 'WeTransfer', icon: '📨' },
     'hightail.com': { name: 'Hightail', icon: '✈️' },
     'egnyte.com': { name: 'Egnyte', icon: '📊' },
-
-    // Drawing/Plan Services
     'planswift.com': { name: 'PlanSwift', icon: '📏' },
     'onscreentakeoff.com': { name: 'On-Screen Takeoff', icon: '📐' },
     'bluebeamcloud.com': { name: 'Bluebeam Cloud', icon: '🔵' },
-
-    // General file links
     'amazonaws.com': { name: 'AWS Download', icon: '☁️' },
     'blob.core.windows.net': { name: 'Azure Storage', icon: '☁️' },
   };

@@ -1,5 +1,159 @@
+// @ts-nocheck
 // Popup Script for Bid Extractor
-// v1.3.0 - MATRIX EDITION
+// v1.3.1 - MATRIX EDITION (Config-based)
+// TODO: Enable type checking after incremental migration
+
+// ===== CONFIG LOADING =====
+// Load configs from JSON files for easy updates
+
+let CONFIG = {
+  gcList: [],
+  keywords: [],
+  priorityWeights: null,
+  platforms: null,
+  loaded: false
+};
+
+async function loadConfigs() {
+  try {
+    const [gcConfig, keywordsConfig, weightsConfig, platformsConfig] = await Promise.all([
+      fetch(chrome.runtime.getURL('src/config/gc-list.json')).then(r => r.json()),
+      fetch(chrome.runtime.getURL('src/config/keywords.json')).then(r => r.json()),
+      fetch(chrome.runtime.getURL('src/config/priority-weights.json')).then(r => r.json()),
+      fetch(chrome.runtime.getURL('src/config/platforms.json')).then(r => r.json())
+    ]);
+
+    CONFIG.gcList = gcConfig.contractors || [];
+    CONFIG.keywords = keywordsConfig.highValueKeywords || [];
+    CONFIG.priorityWeights = weightsConfig;
+    CONFIG.platforms = platformsConfig;
+    CONFIG.loaded = true;
+
+    console.log('Bid Extractor: Configs loaded successfully');
+  } catch (error) {
+    console.error('Bid Extractor: Error loading configs, using defaults:', error);
+    // Fallback to hardcoded defaults if config loading fails
+    CONFIG.gcList = FALLBACK_GCS;
+    CONFIG.keywords = FALLBACK_KEYWORDS;
+    CONFIG.loaded = true;
+  }
+}
+
+// Fallback values in case config loading fails
+const FALLBACK_GCS = [
+  'turner', 'skanska', 'mortenson', 'mccarthy', 'holder', 'whiting-turner',
+  'hensel phelps', 'beck', 'barton malow', 'gilbane', 'brasfield gorrie',
+  'jll', 'cbre', 'webcor', 'swinerton', 'hitt', 'clark construction',
+  'suffolk', 'walsh', 'austin industries', 'ryan companies', 'hoar'
+];
+
+const FALLBACK_KEYWORDS = [
+  'hospital', 'medical center', 'data center', 'high-rise', 'tower',
+  'stadium', 'arena', 'airport', 'university', 'headquarters', 'hq',
+  'million', 'campus', 'research', 'lab', 'biotech', 'pharma',
+  'manufacturing', 'warehouse', 'distribution', 'hotel', 'resort'
+];
+
+// ===== TOAST NOTIFICATIONS =====
+// User feedback system for actions
+
+const toastContainer = document.getElementById('toast-container');
+
+/**
+ * Show a toast notification
+ * @param {string} message - Message to display
+ * @param {'success' | 'error' | 'warning' | 'info'} type - Toast type
+ * @param {number} duration - Duration in ms (0 for persistent)
+ * @returns {HTMLElement} Toast element
+ */
+function showToast(message, type = 'info', duration = 3000) {
+  if (!toastContainer) return null;
+
+  const toast = document.createElement('div');
+  toast.className = `toast toast-${type}`;
+
+  const icons = {
+    success: '✓',
+    error: '✗',
+    warning: '⚠',
+    info: 'ℹ'
+  };
+
+  toast.innerHTML = `
+    <span class="toast-icon">${icons[type] || icons.info}</span>
+    <span class="toast-message">${message}</span>
+    <button class="toast-close" aria-label="Close">×</button>
+  `;
+
+  // Close button handler
+  toast.querySelector('.toast-close').addEventListener('click', () => {
+    dismissToast(toast);
+  });
+
+  toastContainer.appendChild(toast);
+
+  // Auto dismiss
+  if (duration > 0) {
+    setTimeout(() => dismissToast(toast), duration);
+  }
+
+  return toast;
+}
+
+/**
+ * Dismiss a toast with animation
+ * @param {HTMLElement} toast - Toast element to dismiss
+ */
+function dismissToast(toast) {
+  if (!toast || !toast.parentElement) return;
+
+  toast.classList.add('toast-exit');
+  setTimeout(() => {
+    toast.remove();
+  }, 300);
+}
+
+/**
+ * Clear all toasts
+ */
+function clearAllToasts() {
+  if (!toastContainer) return;
+  toastContainer.querySelectorAll('.toast').forEach(toast => {
+    dismissToast(toast);
+  });
+}
+
+// ===== BUTTON LOADING STATE =====
+
+/**
+ * Set button to loading state
+ * @param {HTMLElement} button - Button element
+ */
+function setButtonLoading(button) {
+  if (!button) return;
+  button.classList.add('loading');
+  button.disabled = true;
+}
+
+/**
+ * Remove button loading state
+ * @param {HTMLElement} button - Button element
+ */
+function clearButtonLoading(button) {
+  if (!button) return;
+  button.classList.remove('loading');
+  button.disabled = false;
+}
+
+/**
+ * Flash button to indicate success
+ * @param {HTMLElement} button - Button element
+ */
+function flashButtonSuccess(button) {
+  if (!button) return;
+  button.classList.add('pulse');
+  setTimeout(() => button.classList.remove('pulse'), 600);
+}
 
 // ===== DIGITAL RAIN ANIMATION =====
 // Matrix-style falling characters background
@@ -63,105 +217,117 @@ function initDigitalRain() {
 
 // ===== PRIORITY SCORING SYSTEM =====
 // Score: 0-100 based on deadline, GC reputation, project value, completeness
-
-// Known major GCs that get priority
-const MAJOR_GCS = [
-  'turner', 'skanska', 'mortenson', 'mccarthy', 'holder', 'whiting-turner',
-  'hensel phelps', 'beck', 'barton malow', 'gilbane', 'brasfield gorrie',
-  'jll', 'cbre', 'webcor', 'swinerton', 'hitt', 'clark construction',
-  'suffolk', 'walsh', 'austin industries', 'ryan companies', 'hoar'
-];
-
-// High-value project keywords
-const HIGH_VALUE_KEYWORDS = [
-  'hospital', 'medical center', 'data center', 'high-rise', 'tower',
-  'stadium', 'arena', 'airport', 'university', 'headquarters', 'hq',
-  'million', 'campus', 'research', 'lab', 'biotech', 'pharma',
-  'manufacturing', 'warehouse', 'distribution', 'hotel', 'resort'
-];
+// Weights loaded from config/priority-weights.json
 
 function calculatePriorityScore(bidData) {
   let score = 0;
+  const weights = CONFIG.priorityWeights?.weights;
+  const gcList = CONFIG.gcList.length > 0 ? CONFIG.gcList : FALLBACK_GCS;
+  const keywords = CONFIG.keywords.length > 0 ? CONFIG.keywords : FALLBACK_KEYWORDS;
 
-  // 1. DEADLINE PROXIMITY (max 40 points)
+  // 1. DEADLINE PROXIMITY (max 40 points by default)
+  const deadlineConfig = weights?.deadline || { maxPoints: 40 };
   const bidDate = parseBidDate(bidData.bidDate);
   if (bidDate) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const daysUntilDue = Math.ceil((bidDate - today) / (1000 * 60 * 60 * 24));
 
-    if (daysUntilDue <= 0) {
-      score += 40; // Due today or overdue - MAXIMUM URGENCY
-    } else if (daysUntilDue <= 1) {
-      score += 38; // Tomorrow
-    } else if (daysUntilDue <= 2) {
-      score += 35;
-    } else if (daysUntilDue <= 3) {
-      score += 32;
-    } else if (daysUntilDue <= 5) {
-      score += 28;
-    } else if (daysUntilDue <= 7) {
-      score += 25; // This week
-    } else if (daysUntilDue <= 14) {
-      score += 15; // Two weeks
-    } else if (daysUntilDue <= 30) {
-      score += 10; // Month out
+    // Use config tiers if available, otherwise use defaults
+    if (weights?.deadline?.tiers) {
+      for (const tier of weights.deadline.tiers) {
+        if (tier.daysUntil === null || daysUntilDue <= tier.daysUntil) {
+          score += tier.points;
+          break;
+        }
+      }
     } else {
-      score += 5; // Far out
+      // Default scoring
+      if (daysUntilDue <= 0) score += 40;
+      else if (daysUntilDue <= 1) score += 38;
+      else if (daysUntilDue <= 2) score += 35;
+      else if (daysUntilDue <= 3) score += 32;
+      else if (daysUntilDue <= 5) score += 28;
+      else if (daysUntilDue <= 7) score += 25;
+      else if (daysUntilDue <= 14) score += 15;
+      else if (daysUntilDue <= 30) score += 10;
+      else score += 5;
     }
   }
 
-  // 2. GC REPUTATION (max 20 points)
+  // 2. GC REPUTATION (max 20 points by default)
+  const gcConfig = weights?.gcReputation || { maxPoints: 20, majorGcPoints: 20, knownGcPoints: 10 };
   if (bidData.gc) {
     const gcLower = bidData.gc.toLowerCase();
-    for (const gc of MAJOR_GCS) {
+    let gcMatched = false;
+    for (const gc of gcList) {
       if (gcLower.includes(gc)) {
-        score += 20;
+        score += gcConfig.majorGcPoints;
+        gcMatched = true;
         break;
       }
     }
     // Partial credit for any named GC
-    if (score < 20 && bidData.gc !== 'Unknown GC') {
-      score += 10;
+    if (!gcMatched && bidData.gc !== 'Unknown GC') {
+      score += gcConfig.knownGcPoints;
     }
   }
 
-  // 3. PROJECT VALUE INDICATORS (max 20 points)
+  // 3. PROJECT VALUE INDICATORS (max 20 points by default)
+  const valueConfig = weights?.projectValue || { maxPoints: 20, pointsPerKeyword: 5 };
   const projectText = `${bidData.project || ''} ${bidData.scope || ''} ${bidData.location || ''}`.toLowerCase();
   let valuePoints = 0;
 
-  for (const keyword of HIGH_VALUE_KEYWORDS) {
+  for (const keyword of keywords) {
     if (projectText.includes(keyword)) {
-      valuePoints += 5;
+      valuePoints += valueConfig.pointsPerKeyword;
     }
   }
-  score += Math.min(valuePoints, 20); // Cap at 20
+  score += Math.min(valuePoints, valueConfig.maxPoints);
 
-  // 4. DATA COMPLETENESS (max 10 points)
-  const fields = ['project', 'gc', 'bidDate', 'location', 'scope', 'contact', 'email'];
+  // 4. DATA COMPLETENESS (max 10 points by default)
+  const completenessConfig = weights?.dataCompleteness || {
+    maxPoints: 10,
+    pointsPerField: 1.5,
+    fields: ['project', 'gc', 'bidDate', 'location', 'scope', 'contact', 'email']
+  };
   let filledFields = 0;
-  for (const field of fields) {
+  for (const field of completenessConfig.fields) {
     if (bidData[field] && bidData[field] !== 'N/A' && bidData[field] !== '-') {
       filledFields++;
     }
   }
-  score += Math.min(Math.floor(filledFields * 1.5), 10);
+  score += Math.min(Math.floor(filledFields * completenessConfig.pointsPerField), completenessConfig.maxPoints);
 
-  // 5. ATTACHMENTS BONUS (max 10 points)
+  // 5. ATTACHMENTS BONUS (max 10 points by default)
+  const attachmentConfig = weights?.attachments || { maxPoints: 10, pointsPerAttachment: 2 };
   if (bidData.attachments?.length) {
-    score += Math.min(bidData.attachments.length * 2, 10);
+    score += Math.min(bidData.attachments.length * attachmentConfig.pointsPerAttachment, attachmentConfig.maxPoints);
   }
 
-  return Math.min(score, 100); // Cap at 100
+  const maxScore = CONFIG.priorityWeights?.maxScore || 100;
+  return Math.min(score, maxScore);
 }
 
 function getPriorityLevel(score) {
-  if (score >= 70) return 'high';
-  if (score >= 40) return 'medium';
+  const levels = CONFIG.priorityWeights?.priorityLevels;
+  if (levels) {
+    if (score >= levels.high.minScore) return 'high';
+    if (score >= levels.medium.minScore) return 'medium';
+  } else {
+    if (score >= 70) return 'high';
+    if (score >= 40) return 'medium';
+  }
   return 'low';
 }
 
 function getPriorityLabel(score) {
+  const levels = CONFIG.priorityWeights?.priorityLevels;
+  if (levels) {
+    if (score >= levels.high.minScore) return levels.high.label;
+    if (score >= levels.medium.minScore) return levels.medium.label;
+    return levels.low.label;
+  }
   if (score >= 70) return 'HIGH';
   if (score >= 40) return 'MED';
   return 'LOW';
@@ -276,6 +442,9 @@ let currentExtraction = null;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
+  // Load configs first (important for priority scoring)
+  await loadConfigs();
+
   // Start Matrix digital rain animation
   initDigitalRain();
 
@@ -317,7 +486,7 @@ function setStatus(type, text) {
 // Extract button click
 extractBtn.addEventListener('click', async () => {
   setStatus('loading', 'Extracting...');
-  extractBtn.disabled = true;
+  setButtonLoading(extractBtn);
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -325,7 +494,8 @@ extractBtn.addEventListener('click', async () => {
 
     if (!tab?.id) {
       setStatus('error', 'Cannot access tab');
-      extractBtn.disabled = false;
+      clearButtonLoading(extractBtn);
+      showToast('Cannot access current tab', 'error');
       return;
     }
 
@@ -361,26 +531,37 @@ extractBtn.addEventListener('click', async () => {
 
         console.log('Files saved to:', folderName);
         setStatus('ready', 'Extracted & Saved!');
+        showToast(`Bid extracted: ${currentExtraction.project || 'Unknown'}`, 'success');
+        flashButtonSuccess(extractBtn);
       } catch (downloadErr) {
         console.error('Auto-download failed:', downloadErr);
         setStatus('ready', 'Extracted! Click Download to save.');
+        showToast('Extracted! Auto-download failed.', 'warning');
       }
     } else {
       setStatus('error', response?.error || 'Extraction failed');
+      showToast(response?.error || 'Extraction failed', 'error');
+      extractBtn.classList.add('shake');
+      setTimeout(() => extractBtn.classList.remove('shake'), 400);
     }
   } catch (error) {
     console.error('Extraction error:', error);
     // More helpful error messages
     if (error.message?.includes('Receiving end does not exist')) {
       setStatus('error', 'Refresh Gmail page first');
+      showToast('Refresh the email page first', 'error');
     } else if (error.message?.includes('Cannot access')) {
       setStatus('error', 'Cannot access this page');
+      showToast('Cannot access this page', 'error');
     } else {
       setStatus('error', error.message || 'Try refreshing page');
+      showToast(error.message || 'Try refreshing the page', 'error');
     }
+    extractBtn.classList.add('shake');
+    setTimeout(() => extractBtn.classList.remove('shake'), 400);
   }
 
-  extractBtn.disabled = false;
+  clearButtonLoading(extractBtn);
 });
 
 // Display extracted data
@@ -460,10 +641,13 @@ function displayDownloadLinks(links) {
 
 // Download button click
 downloadBtn.addEventListener('click', async () => {
-  if (!currentExtraction) return;
+  if (!currentExtraction) {
+    showToast('No extraction data available', 'warning');
+    return;
+  }
 
   setStatus('loading', 'Downloading...');
-  downloadBtn.disabled = true;
+  setButtonLoading(downloadBtn);
 
   try {
     // Get settings
@@ -475,10 +659,13 @@ downloadBtn.addEventListener('click', async () => {
     // Create folder name
     const folderName = createFolderName(folderPattern, currentExtraction);
 
+    let downloadCount = 0;
+
     // Download attachments
     if (currentExtraction.attachments?.length) {
       for (const attachment of currentExtraction.attachments) {
         await downloadFile(attachment.url, `${folderName}/${attachment.name}`);
+        downloadCount++;
       }
     }
 
@@ -489,6 +676,7 @@ downloadBtn.addEventListener('click', async () => {
       const url = URL.createObjectURL(blob);
       await downloadFile(url, `${folderName}/bid_info.txt`);
       URL.revokeObjectURL(url);
+      downloadCount++;
     }
 
     // Create Project Info Sheet HTML
@@ -497,25 +685,36 @@ downloadBtn.addEventListener('click', async () => {
     const htmlUrl = URL.createObjectURL(htmlBlob);
     await downloadFile(htmlUrl, `${folderName}/Project_Info_Sheet.html`);
     URL.revokeObjectURL(htmlUrl);
+    downloadCount++;
 
     setStatus('ready', 'Downloaded!');
+    showToast(`${downloadCount} file(s) downloaded`, 'success');
+    flashButtonSuccess(downloadBtn);
   } catch (error) {
     console.error('Download error:', error);
     setStatus('error', 'Download failed');
+    showToast('Download failed: ' + (error.message || 'Unknown error'), 'error');
+    downloadBtn.classList.add('shake');
+    setTimeout(() => downloadBtn.classList.remove('shake'), 400);
   }
 
-  downloadBtn.disabled = false;
+  clearButtonLoading(downloadBtn);
 });
 
 // Copy button click
 copyBtn.addEventListener('click', async () => {
-  if (!currentExtraction) return;
+  if (!currentExtraction) {
+    showToast('No extraction data to copy', 'warning');
+    return;
+  }
 
   const text = createSummaryText(currentExtraction);
 
   try {
     await navigator.clipboard.writeText(text);
     copyBtn.textContent = 'copied!';
+    flashButtonSuccess(copyBtn);
+    showToast('Bid info copied to clipboard', 'success', 2000);
     setTimeout(() => {
       copyBtn.innerHTML = `
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -527,6 +726,7 @@ copyBtn.addEventListener('click', async () => {
     }, 2000);
   } catch (error) {
     console.error('Copy error:', error);
+    showToast('Failed to copy to clipboard', 'error');
   }
 });
 
@@ -937,13 +1137,19 @@ saveSettings.addEventListener('click', async () => {
   const autoDownload = document.getElementById('auto-download').checked;
   const createSummary = document.getElementById('create-summary').checked;
 
-  await chrome.storage.local.set({
-    folderPattern,
-    autoDownload,
-    createSummary
-  });
+  try {
+    await chrome.storage.local.set({
+      folderPattern,
+      autoDownload,
+      createSummary
+    });
 
-  settingsModal.classList.add('hidden');
+    settingsModal.classList.add('hidden');
+    showToast('Settings saved', 'success', 2000);
+  } catch (error) {
+    console.error('Failed to save settings:', error);
+    showToast('Failed to save settings', 'error');
+  }
 });
 
 async function loadSettings() {

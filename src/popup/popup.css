@@ -1008,3 +1008,249 @@ body::before {
   outline: 2px solid var(--matrix-green);
   outline-offset: 2px;
 }
+
+/* ============================================
+   TOAST NOTIFICATIONS
+   ============================================ */
+.toast-container {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+  width: 90%;
+  max-width: 360px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--matrix-green-dark);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), var(--glow-green);
+  pointer-events: auto;
+  animation: toastSlideIn 0.3s ease-out;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.toast.toast-exit {
+  animation: toastSlideOut 0.3s ease-in forwards;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes toastSlideOut {
+  from {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+}
+
+.toast-icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.toast-message {
+  flex: 1;
+  font-family: var(--font-terminal);
+}
+
+.toast-close {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 4px;
+  font-size: 16px;
+  opacity: 0.6;
+  transition: opacity 0.2s;
+}
+
+.toast-close:hover {
+  opacity: 1;
+}
+
+/* Toast Types */
+.toast.toast-success {
+  border-color: var(--matrix-green);
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(0, 255, 0, 0.08) 100%);
+}
+
+.toast.toast-success .toast-icon {
+  color: var(--matrix-green);
+}
+
+.toast.toast-error {
+  border-color: var(--priority-high);
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(255, 0, 64, 0.08) 100%);
+}
+
+.toast.toast-error .toast-icon {
+  color: var(--priority-high);
+}
+
+.toast.toast-warning {
+  border-color: var(--priority-medium);
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(255, 102, 0, 0.08) 100%);
+}
+
+.toast.toast-warning .toast-icon {
+  color: var(--priority-medium);
+}
+
+.toast.toast-info {
+  border-color: #00aaff;
+  background: linear-gradient(135deg, var(--bg-elevated) 0%, rgba(0, 170, 255, 0.08) 100%);
+}
+
+.toast.toast-info .toast-icon {
+  color: #00aaff;
+}
+
+/* ============================================
+   LOADING SPINNER
+   ============================================ */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--matrix-green-dim);
+  border-top-color: var(--matrix-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.spinner-sm {
+  width: 12px;
+  height: 12px;
+  border-width: 1.5px;
+}
+
+.spinner-lg {
+  width: 24px;
+  height: 24px;
+  border-width: 3px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Button loading state */
+.btn.loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.btn.loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(0, 255, 0, 0.3);
+  border-top-color: var(--matrix-green);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+.btn.loading svg {
+  visibility: hidden;
+}
+
+/* ============================================
+   PROGRESS BAR
+   ============================================ */
+.progress-bar {
+  width: 100%;
+  height: 4px;
+  background: var(--bg-surface);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--matrix-green-dark), var(--matrix-green));
+  border-radius: 2px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 8px var(--matrix-green-glow);
+}
+
+/* ============================================
+   PULSE ANIMATION FOR ACTIONS
+   ============================================ */
+.pulse {
+  animation: pulse 0.6s ease-out;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 0, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(0, 255, 0, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 0, 0);
+  }
+}
+
+/* Success flash */
+.flash-success {
+  animation: flashSuccess 0.5s ease-out;
+}
+
+@keyframes flashSuccess {
+  0% {
+    background-color: rgba(0, 255, 0, 0.3);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Error shake */
+.shake {
+  animation: shake 0.4s ease-out;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
