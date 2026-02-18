@@ -184,6 +184,249 @@ const EmailParser = {
     }
     return false;
   },
+
+  // --- Section identification ---
+
+  /**
+   * Greeting patterns to strip from the top of the email body.
+   */
+  GREETING_REGEX: /^(?:Dear\s+.+|Hi\s+.+|Hello\s+.+|Good\s+(?:morning|afternoon|evening).*)[\s,]*$/im,
+
+  /**
+   * Patterns that indicate the start of a signature / closing block.
+   * Reuses SIGNATURE_DELIMITERS but also catches "Thank you for your interest" style closings.
+   */
+  CLOSING_PATTERNS: [
+    /^--\s*$/m,
+    /^Best regards,?\s*$/im,
+    /^Kind regards,?\s*$/im,
+    /^Regards,?\s*$/im,
+    /^Sincerely,?\s*$/im,
+    /^Thanks,?\s*$/im,
+    /^Thank you,?\s*$/im,
+    /^Cheers,?\s*$/im,
+    /^Respectfully,?\s*$/im,
+  ],
+
+  /**
+   * Single-line field patterns: label on same line as value.
+   */
+  FIELD_PATTERNS: {
+    project: /^(?:Project\s*Name|Job\s*Name)\s*:\s*(.+)/im,
+    location: /^(?:Location|Site\s*Address)\s*:\s*(.+)/im,
+  },
+
+  /**
+   * Multi-line section headers. Each key maps to the regex that starts
+   * the section; the section body is everything until the next header
+   * or a double blank line.
+   */
+  SECTION_HEADERS: {
+    scope: /^Scope\s+of\s+Work\s*:/im,
+    submissionInstructions: /^Submission\s+Instructions?\s*:/im,
+    preBidMeeting: /^Pre[- ]?Bid\s+Meeting\s*:/im,
+    bondRequirements: /^Bond\s+Requirements?\s*:/im,
+    addenda: /^Addenda\s*:/im,
+  },
+
+  /**
+   * Generic header detector: a line that begins with one or more
+   * capitalized words followed by a colon.
+   */
+  GENERIC_HEADER_REGEX: /^[A-Z][A-Za-z\s-]+:\s*$/,
+
+  /**
+   * Identify structured sections within an email body.
+   * @param {string} text - Full email body text
+   * @returns {{ project: string, location: string, scope: string,
+   *             submissionInstructions: string, preBidMeeting: string,
+   *             bondRequirements: string, addenda: string, generalNotes: string }}
+   */
+  identifySections(text) {
+    const empty = {
+      project: '',
+      location: '',
+      scope: '',
+      submissionInstructions: '',
+      preBidMeeting: '',
+      bondRequirements: '',
+      addenda: '',
+      generalNotes: '',
+    };
+
+    if (!text || typeof text !== 'string') {
+      return empty;
+    }
+
+    // 1. Strip signature / closing block
+    const body = this._removeClosing(text);
+
+    // 2. Strip greeting line(s) to build generalNotes base
+    const bodyNoGreeting = this._removeGreeting(body);
+
+    // 3. Extract single-line fields
+    const result = { ...empty };
+    for (const [key, pattern] of Object.entries(this.FIELD_PATTERNS)) {
+      const match = body.match(pattern);
+      if (match) {
+        result[key] = match[1].trim();
+      }
+    }
+
+    // 4. Extract multi-line sections
+    for (const [key, headerPattern] of Object.entries(this.SECTION_HEADERS)) {
+      const sectionText = this._extractMultiLineSection(body, headerPattern);
+      if (sectionText) {
+        result[key] = sectionText;
+      }
+    }
+
+    // 5. Detect scope from "includes:" pattern if scope not already found
+    if (!result.scope) {
+      result.scope = this._extractIncludesScope(body);
+    }
+
+    // 6. Build generalNotes: body minus greeting and signature.
+    //    If no structured sections were found, generalNotes is the whole cleaned body.
+    result.generalNotes = bodyNoGreeting.trim();
+
+    return result;
+  },
+
+  /**
+   * Remove everything from the first closing/signature delimiter onward.
+   * @param {string} text
+   * @returns {string}
+   */
+  _removeClosing(text) {
+    let earliest = text.length;
+
+    for (const pattern of this.CLOSING_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        const idx = text.indexOf(match[0]);
+        if (idx < earliest) {
+          earliest = idx;
+        }
+      }
+    }
+
+    return text.slice(0, earliest).trim();
+  },
+
+  /**
+   * Remove greeting lines from the top of the body.
+   * Strips "Dear X," / "Hi Team," style lines and any immediately
+   * following blank lines.
+   * @param {string} text
+   * @returns {string}
+   */
+  _removeGreeting(text) {
+    const lines = text.split('\n');
+    let start = 0;
+
+    // Skip leading blank lines
+    while (start < lines.length && lines[start].trim() === '') {
+      start++;
+    }
+
+    // Check if first non-blank line is a greeting
+    if (start < lines.length && this.GREETING_REGEX.test(lines[start].trim())) {
+      start++;
+      // Skip blank lines after greeting
+      while (start < lines.length && lines[start].trim() === '') {
+        start++;
+      }
+    }
+
+    return lines.slice(start).join('\n').trim();
+  },
+
+  /**
+   * Combined pattern matching any known top-level section header.
+   * Used to detect section boundaries when extracting multi-line sections.
+   * Short sub-field labels like "Date:" or "Location:" within a section
+   * should NOT terminate it -- only these known top-level headers do.
+   */
+  TOP_LEVEL_HEADER_REGEX: /^(?:Scope\s+of\s+Work|Submission\s+Instructions?|Pre[- ]?Bid\s+Meeting|Bond\s+Requirements?|Addenda|Project\s*Name|Job\s*Name|Bid\s+Date)\s*:/i,
+
+  /**
+   * Extract a multi-line section that starts with the given header pattern.
+   * The section ends at the next recognized top-level header or double blank line.
+   * @param {string} text
+   * @param {RegExp} headerPattern
+   * @returns {string}
+   */
+  _extractMultiLineSection(text, headerPattern) {
+    const match = text.match(headerPattern);
+    if (!match) {
+      return '';
+    }
+
+    const startIdx = text.indexOf(match[0]) + match[0].length;
+    const rest = text.slice(startIdx);
+    const lines = rest.split('\n');
+    const collected = [];
+    let blankCount = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Only break on known top-level section headers, not sub-field labels
+      if (collected.length > 0 && this.TOP_LEVEL_HEADER_REGEX.test(trimmed)) {
+        break;
+      }
+
+      if (trimmed === '') {
+        blankCount++;
+        if (blankCount >= 2) {
+          break;
+        }
+        collected.push(line);
+      } else {
+        blankCount = 0;
+        collected.push(line);
+      }
+    }
+
+    return collected.join('\n').trim();
+  },
+
+  /**
+   * Extract scope from an "includes:" bullet-list pattern.
+   * Matches lines like "The steel package includes:" followed by
+   * bullet lines starting with "-" or "*".
+   * @param {string} text
+   * @returns {string}
+   */
+  _extractIncludesScope(text) {
+    const includesMatch = text.match(/includes\s*:\s*$/im);
+    if (!includesMatch) {
+      return '';
+    }
+
+    const startIdx = text.indexOf(includesMatch[0]) + includesMatch[0].length;
+    const rest = text.slice(startIdx);
+    const lines = rest.split('\n');
+    const bullets = [];
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (trimmed === '') {
+        if (bullets.length > 0) {
+          break;
+        }
+        continue;
+      }
+      if (/^[-*]/.test(trimmed)) {
+        bullets.push(trimmed);
+      } else if (bullets.length > 0) {
+        break;
+      }
+    }
+
+    return bullets.join('\n').trim();
+  },
 };
 
 // Dual export: Node.js (tests) and browser (content script)

@@ -92,3 +92,80 @@ bob@walshgroup.com`;
     expect(sig.email).toBe('bob@walshgroup.com');
   });
 });
+
+describe('EmailParser.identifySections', () => {
+  test('extracts labeled sections from structured email', () => {
+    const text = `Dear Subcontractor,
+
+We are requesting bids for the following project.
+
+Project Name: Dallas Medical Center Expansion
+Location: 1234 Main St, Dallas, TX 75201
+Bid Date: February 25, 2026 at 2:00 PM CST
+
+Scope of Work:
+Furnish and install structural steel, miscellaneous metals,
+and steel deck per plans and specifications.
+Approximately 500 tons.
+
+Submission Instructions:
+Please submit your proposal via BuildingConnected
+by 2:00 PM CST on February 25, 2026.
+Include all alternates and unit prices.
+
+Pre-Bid Meeting:
+Date: February 18, 2026 at 10:00 AM
+Location: Project Site - 1234 Main St, Dallas, TX
+Attendance is mandatory for all bidders.
+
+Bond Requirements:
+Bid Bond: 5% of bid amount
+Performance and Payment Bond: 100% of contract
+
+Thank you for your interest.`;
+
+    const sections = EmailParser.identifySections(text);
+    expect(sections.project).toBe('Dallas Medical Center Expansion');
+    expect(sections.location).toBe('1234 Main St, Dallas, TX 75201');
+    expect(sections.scope).toContain('structural steel');
+    expect(sections.submissionInstructions).toContain('BuildingConnected');
+    expect(sections.preBidMeeting).toContain('February 18');
+    expect(sections.bondRequirements).toContain('5%');
+  });
+
+  test('captures general notes from unstructured email', () => {
+    const text = `Hi Team,
+
+I wanted to reach out regarding an upcoming steel package. We have a
+new warehouse project in Houston that needs structural steel and joists.
+The plans are not finalized yet but we expect around 200 tons.
+
+Let me know if you're interested and I'll send the plans over.
+
+Thanks,
+Mark`;
+
+    const sections = EmailParser.identifySections(text);
+    expect(sections.generalNotes).toContain('warehouse project in Houston');
+    expect(sections.generalNotes).toContain('200 tons');
+  });
+
+  test('extracts scope from "includes" pattern', () => {
+    const text = `The steel package includes:
+- Structural steel framing
+- Miscellaneous metals
+- Steel deck (composite)
+- Connection design
+
+Bid Date: March 1, 2026`;
+
+    const sections = EmailParser.identifySections(text);
+    expect(sections.scope).toContain('Structural steel framing');
+  });
+
+  test('handles emails with no clear sections', () => {
+    const text = 'Quick note - bid is due Friday. Plans on BC.';
+    const sections = EmailParser.identifySections(text);
+    expect(sections.generalNotes).toBe('Quick note - bid is due Friday. Plans on BC.');
+  });
+});
