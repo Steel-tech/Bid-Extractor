@@ -671,6 +671,222 @@ const EmailParser = {
       .map(line => line.replace(/^>\s?/, ''))
       .join('\n');
   },
+
+  // --- Metadata extraction ---
+
+  /**
+   * Time pattern: H:MM or HH:MM followed by AM/PM and optional timezone.
+   */
+  BID_TIME_REGEX: /\d{1,2}:\d{2}\s*(?:AM|PM)\s*(?:[A-Z]{2,4})?/i,
+
+  /**
+   * Keywords that signal a bid time follows or precedes the time value.
+   */
+  BID_TIME_CONTEXT_KEYWORDS: /(?:by|before|no\s+later\s+than|due(?:\s+at)?|deadline)/i,
+
+  /**
+   * Patterns for extracting project manager name.
+   * Matches "Project Manager:", "PM:", "Point of Contact:", "POC:", "Contact:"
+   * followed by a name (capitalized words).
+   */
+  PM_REGEX: /^(?:Project\s+Manager|PM|Point\s+of\s+Contact|POC|Contact)\s*:\s*([A-Z][a-zA-Z]+(?:[ \t]+[A-Z][a-zA-Z]+)+)/im,
+
+  /**
+   * Patterns for addenda references on a line.
+   */
+  ADDENDUM_REGEX: /Addendum\s+(?:No\.?\s*|#)?\d+/gi,
+
+  /**
+   * Extract metadata from email body text.
+   *
+   * @param {string} text - Full email body text
+   * @returns {{
+   *   bidTime: string,
+   *   projectManager: string,
+   *   preBidMeeting: { date: string, location: string, mandatory: boolean },
+   *   addenda: string[],
+   *   bondRequirements: string
+   * }}
+   */
+  extractMetadata(text) {
+    const empty = {
+      bidTime: '',
+      projectManager: '',
+      preBidMeeting: { date: '', location: '', mandatory: false },
+      addenda: [],
+      bondRequirements: '',
+    };
+
+    if (!text || typeof text !== 'string') {
+      return empty;
+    }
+
+    return {
+      bidTime: this._extractBidTime(text),
+      projectManager: this._extractProjectManager(text),
+      preBidMeeting: this._extractPreBidMeeting(text),
+      addenda: this._extractAddenda(text),
+      bondRequirements: this._extractBondRequirements(text),
+    };
+  },
+
+  /**
+   * Extract bid time from text.
+   * Looks for time patterns near context keywords like "by", "before", "due".
+   * @param {string} text
+   * @returns {string}
+   */
+  _extractBidTime(text) {
+    // Strategy: scan each sentence/clause for a context keyword near a time pattern.
+    // We check line by line for better precision.
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+      if (!this.BID_TIME_CONTEXT_KEYWORDS.test(line)) {
+        continue;
+      }
+      const timeMatch = line.match(this.BID_TIME_REGEX);
+      if (timeMatch) {
+        return timeMatch[0].trim();
+      }
+    }
+
+    return '';
+  },
+
+  /**
+   * Extract project manager name from text.
+   * @param {string} text
+   * @returns {string}
+   */
+  _extractProjectManager(text) {
+    const match = text.match(this.PM_REGEX);
+    if (match) {
+      return match[1].trim();
+    }
+    return '';
+  },
+
+  /**
+   * Extract pre-bid meeting details from a "Pre-Bid Meeting:" section.
+   * @param {string} text
+   * @returns {{ date: string, location: string, mandatory: boolean }}
+   */
+  _extractPreBidMeeting(text) {
+    const result = { date: '', location: '', mandatory: false };
+
+    // Find the Pre-Bid Meeting section
+    const sectionMatch = text.match(/Pre[- ]?Bid\s+Meeting\s*:/i);
+    if (!sectionMatch) {
+      return result;
+    }
+
+    const startIdx = text.indexOf(sectionMatch[0]) + sectionMatch[0].length;
+    const rest = text.slice(startIdx);
+
+    // Take lines until a double blank or a new top-level section header
+    const lines = rest.split('\n');
+    const sectionLines = [];
+    let blankCount = 0;
+
+    for (const line of lines) {
+      const trimmed = line.trim();
+
+      // Stop at known top-level headers (but not sub-fields like Date:/Location:)
+      if (sectionLines.length > 0 && this.TOP_LEVEL_HEADER_REGEX.test(trimmed)) {
+        break;
+      }
+
+      if (trimmed === '') {
+        blankCount++;
+        if (blankCount >= 2) {
+          break;
+        }
+      } else {
+        blankCount = 0;
+      }
+
+      sectionLines.push(trimmed);
+    }
+
+    const sectionText = sectionLines.join('\n');
+
+    // Extract Date: line
+    const dateMatch = sectionText.match(/Date\s*:\s*(.+)/i);
+    if (dateMatch) {
+      result.date = dateMatch[1].trim();
+    }
+
+    // Extract Location: line
+    const locationMatch = sectionText.match(/Location\s*:\s*(.+)/i);
+    if (locationMatch) {
+      result.location = locationMatch[1].trim();
+    }
+
+    // Check for mandatory/required/must attend
+    if (/\b(?:mandatory|required|must\s+attend)\b/i.test(sectionText)) {
+      result.mandatory = true;
+    }
+
+    return result;
+  },
+
+  /**
+   * Extract addenda references from text.
+   * Each line containing "Addendum No. X", "Addendum #X", or "Addendum X"
+   * is captured as a separate entry.
+   * @param {string} text
+   * @returns {string[]}
+   */
+  _extractAddenda(text) {
+    const results = [];
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+      const matches = line.match(this.ADDENDUM_REGEX);
+      if (matches) {
+        // For each match on this line, capture the full line trimmed
+        // but only add the line once per unique addendum reference
+        for (const m of matches) {
+          results.push(line.trim());
+        }
+      }
+    }
+
+    // Deduplicate in case a single line had multiple matches
+    // (we want one entry per line, not per match within a line)
+    const seen = new Set();
+    const deduped = [];
+    for (const entry of results) {
+      if (!seen.has(entry)) {
+        seen.add(entry);
+        deduped.push(entry);
+      }
+    }
+
+    return deduped;
+  },
+
+  /**
+   * Extract bond requirement text.
+   * Finds lines mentioning "bid bond", "performance bond", or "payment bond"
+   * and collects surrounding context.
+   * @param {string} text
+   * @returns {string}
+   */
+  _extractBondRequirements(text) {
+    const bondPattern = /\b(?:bid\s+bond|performance\s+(?:and\s+payment\s+)?bond|payment\s+bond|surety\s+bond)\b/i;
+    const lines = text.split('\n');
+    const bondLines = [];
+
+    for (const line of lines) {
+      if (bondPattern.test(line)) {
+        bondLines.push(line.trim());
+      }
+    }
+
+    return bondLines.join('\n').trim();
+  },
 };
 
 // Dual export: Node.js (tests) and browser (content script)

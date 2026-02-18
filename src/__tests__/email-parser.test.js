@@ -223,3 +223,61 @@ Please bid on the attached steel package.`;
     expect(EmailParser.extractThreadMessages(null)).toEqual([]);
   });
 });
+
+describe('EmailParser.extractMetadata', () => {
+  test('extracts bid time separately from date', () => {
+    const text = 'Bids are due by 2:00 PM CST on February 25, 2026.';
+    const meta = EmailParser.extractMetadata(text);
+    expect(meta.bidTime).toBe('2:00 PM CST');
+  });
+
+  test('extracts bid time with "before" pattern', () => {
+    const text = 'Please submit before 5:00 PM EST.';
+    const meta = EmailParser.extractMetadata(text);
+    expect(meta.bidTime).toBe('5:00 PM EST');
+  });
+
+  test('extracts pre-bid meeting details', () => {
+    const text = `Pre-Bid Meeting:
+Date: February 18, 2026 at 10:00 AM
+Location: Project Site - 1234 Main St
+Attendance is mandatory.`;
+
+    const meta = EmailParser.extractMetadata(text);
+    expect(meta.preBidMeeting.date).toContain('February 18');
+    expect(meta.preBidMeeting.location).toContain('1234 Main St');
+    expect(meta.preBidMeeting.mandatory).toBe(true);
+  });
+
+  test('extracts addenda references', () => {
+    const text = `Addendum No. 1 has been issued.
+Please also see Addendum #2 attached.
+Addendum 3 was posted to BuildingConnected.`;
+
+    const meta = EmailParser.extractMetadata(text);
+    expect(meta.addenda.length).toBe(3);
+    expect(meta.addenda[0]).toContain('Addendum No. 1');
+  });
+
+  test('extracts bond requirements', () => {
+    const text = `A bid bond of 5% is required.
+Performance and payment bond will be required at 100%.`;
+
+    const meta = EmailParser.extractMetadata(text);
+    expect(meta.bondRequirements).toContain('bid bond');
+    expect(meta.bondRequirements).toContain('5%');
+  });
+
+  test('extracts project manager from body', () => {
+    const text = 'Project Manager: Sarah Johnson\nPlease direct questions to the PM.';
+    const meta = EmailParser.extractMetadata(text);
+    expect(meta.projectManager).toBe('Sarah Johnson');
+  });
+
+  test('returns empty values for no metadata', () => {
+    const meta = EmailParser.extractMetadata('Just a short email.');
+    expect(meta.bidTime).toBe('');
+    expect(meta.addenda).toEqual([]);
+    expect(meta.preBidMeeting.date).toBe('');
+  });
+});
