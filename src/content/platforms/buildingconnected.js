@@ -18,7 +18,8 @@
     switch (request.action) {
       case 'extractDocuments':
         extractDocuments().then(docs => {
-          sendResponse({ success: true, documents: docs });
+          const info = extractProjectInfo();
+          sendResponse({ success: true, documents: docs, projectInfo: info });
         }).catch(err => {
           sendResponse({ success: false, error: err.message });
         });
@@ -73,6 +74,83 @@
     }
 
     return 'Unknown Project';
+  }
+
+  // Extract bid/project info from page text
+  function extractProjectInfo() {
+    const text = document.body?.innerText || '';
+    const info = {
+      projectName: getProjectName(),
+      gc: '',
+      bidDate: '',
+      bidTime: '',
+      location: '',
+      scope: '',
+      notes: '',
+      source: 'BuildingConnected',
+      url: window.location.href
+    };
+
+    // GC / Company - look for company names near "by", "from", "general contractor", "invited by"
+    const gcPatterns = [
+      /(?:invited by|from|general contractor|gc|owner|company)[:\s]+([A-Z][\w\s&.,'-]{2,60})/im,
+      /(?:posted by|sent by|created by)[:\s]+([A-Z][\w\s&.,'-]{2,60})/im,
+    ];
+    for (const pat of gcPatterns) {
+      const m = text.match(pat);
+      if (m) { info.gc = m[1].trim(); break; }
+    }
+
+    // Bid date - look for date patterns near "due", "bid", "deadline", "submit"
+    const dateBlock = text.match(/(?:due|bid|deadline|submit|response)[^]*?(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})/im);
+    if (dateBlock) info.bidDate = dateBlock[1].trim();
+
+    // Bid time - look for time near due/bid keywords
+    const timeBlock = text.match(/(?:due|bid|deadline|submit|by)[^]*?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.)?(?:\s*[A-Z]{2,4})?)/im);
+    if (timeBlock) info.bidTime = timeBlock[1].trim();
+
+    // Location - look for address patterns (city, state ZIP or street address)
+    const locPatterns = [
+      /(?:location|address|project location|site|city)[:\s]+([^\n]{5,80})/im,
+      /(\d+\s+[\w\s]+(?:St|Ave|Blvd|Dr|Rd|Way|Ln|Ct|Pkwy|Hwy)\.?[,\s]+[\w\s]+,?\s*[A-Z]{2}\s*\d{5})/m,
+      /([\w\s]+,\s*[A-Z]{2}\s+\d{5})/m,
+    ];
+    for (const pat of locPatterns) {
+      const m = text.match(pat);
+      if (m) { info.location = m[1].trim(); break; }
+    }
+
+    // Scope / Trade
+    const scopePatterns = [
+      /(?:scope|trade|division|csi|work type|bid package)[:\s]+([^\n]{3,120})/im,
+      /(?:structural steel|miscellaneous metals|steel erection|steel fabrication|rebar|reinforcing|metal deck|precast|concrete|masonry|roofing|mechanical|electrical|plumbing|hvac|fire protection|glazing|curtain wall|drywall|framing|painting|flooring|elevator)/im,
+    ];
+    for (const pat of scopePatterns) {
+      const m = text.match(pat);
+      if (m) { info.scope = (m[1] || m[0]).trim(); break; }
+    }
+
+    // Notes / Messages - grab visible message or description blocks
+    const noteSections = document.querySelectorAll(
+      '[class*="message"], [class*="Message"], [class*="description"], [class*="Description"], ' +
+      '[class*="note"], [class*="Note"], [class*="comment"], [class*="Comment"], ' +
+      '[data-testid*="message"], [data-testid*="description"]'
+    );
+    const noteTexts = [];
+    noteSections.forEach(el => {
+      const t = el.innerText?.trim();
+      if (t && t.length > 10 && t.length < 2000) noteTexts.push(t);
+    });
+    if (noteTexts.length === 0) {
+      // Fallback: grab any <p> blocks that look like descriptions
+      document.querySelectorAll('p').forEach(p => {
+        const t = p.innerText?.trim();
+        if (t && t.length > 30 && t.length < 1500) noteTexts.push(t);
+      });
+    }
+    info.notes = noteTexts.slice(0, 5).join('\n---\n');
+
+    return info;
   }
 
   // Extract all documents from the page

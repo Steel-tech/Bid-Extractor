@@ -17,7 +17,8 @@
     switch (request.action) {
       case 'extractDocuments':
         extractDocuments().then(docs => {
-          sendResponse({ success: true, documents: docs });
+          const info = extractProjectInfo();
+          sendResponse({ success: true, documents: docs, projectInfo: info });
         }).catch(err => {
           sendResponse({ success: false, error: err.message });
         });
@@ -65,6 +66,42 @@
     }
 
     return document.title.split('-')[0].trim() || 'Unknown Project';
+  }
+
+  // Extract bid/project info by scanning page text
+  function extractProjectInfo() {
+    const text = document.body?.innerText || '';
+    const info = {
+      projectName: getProjectName(),
+      gc: '', bidDate: '', bidTime: '', location: '', scope: '', notes: '',
+      source: 'Procore', url: window.location.href
+    };
+
+    const gcMatch = text.match(/(?:general contractor|gc|company|owner|posted by|invited by)[:\s]+([A-Z][\w\s&.,'-]{2,60})/im);
+    if (gcMatch) info.gc = gcMatch[1].trim();
+
+    const dateMatch = text.match(/(?:bid date|due date|deadline|bid due|response date)[:\s]+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})/im);
+    if (dateMatch) info.bidDate = dateMatch[1].trim();
+
+    const timeMatch = text.match(/(?:bid time|due time|due by|time)[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?(?:\s*[A-Z]{2,4})?)/im);
+    if (timeMatch) info.bidTime = timeMatch[1].trim();
+
+    const locMatch = text.match(/(?:location|address|city|project location)[:\s]+([^\n]{5,80})/im);
+    if (locMatch) info.location = locMatch[1].trim();
+
+    const scopeMatch = text.match(/(?:scope|trade|division|csi|bid package|work type)[:\s]+([^\n]{3,120})/im);
+    if (scopeMatch) info.scope = scopeMatch[1].trim();
+
+    const noteEls = document.querySelectorAll('[class*="description"], [class*="note"], [class*="message"], [data-qa*="description"]');
+    const noteTexts = [];
+    noteEls.forEach(el => { const t = el.innerText?.trim(); if (t && t.length > 10 && t.length < 2000) noteTexts.push(t); });
+    if (noteTexts.length === 0) {
+      const descMatch = text.match(/(?:description|notes|message|instructions)[:\s]+([^\n].{10,1500})/im);
+      if (descMatch) noteTexts.push(descMatch[1].trim());
+    }
+    info.notes = noteTexts.slice(0, 5).join('\n---\n');
+
+    return info;
   }
 
   // Extract documents

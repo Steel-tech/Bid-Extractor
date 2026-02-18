@@ -583,23 +583,98 @@ function handleEmailResponse(response) {
 }
 
 function handlePlatformResponse(response) {
-  if (response?.success && response.documents) {
-    const docs = response.documents;
+  if (response?.success) {
+    const docs = response.documents || [];
+    const info = response.projectInfo || {};
     const count = docs.length;
 
-    setStatus('ready', `${count} document(s) found`);
+    // Populate preview card with project info
+    if (info.projectName) {
+      const el = document.getElementById('preview-project');
+      if (el) el.textContent = info.projectName;
+    }
+    if (info.gc) {
+      const el = document.getElementById('preview-gc');
+      if (el) el.textContent = info.gc;
+    }
+    if (info.bidDate) {
+      const el = document.getElementById('preview-date');
+      if (el) el.textContent = info.bidDate;
+    }
+    if (info.bidTime) {
+      const el = document.getElementById('preview-time');
+      if (el) el.textContent = info.bidTime;
+    }
+    if (info.location) {
+      const el = document.getElementById('preview-location');
+      if (el) el.textContent = info.location;
+    }
+    if (info.scope) {
+      const el = document.getElementById('preview-scope');
+      if (el) el.textContent = info.scope;
+    }
+    if (info.notes) {
+      const el = document.getElementById('preview-notes');
+      if (el) {
+        const short = info.notes.length > 80 ? info.notes.substring(0, 80) + '...' : info.notes;
+        el.textContent = short;
+        el.title = info.notes;
+        el.style.cursor = 'pointer';
+        el.onclick = () => {
+          const expanded = document.getElementById('notes-expanded');
+          const fullText = document.getElementById('notes-full-text');
+          if (expanded && fullText) {
+            fullText.textContent = info.notes;
+            expanded.classList.toggle('hidden');
+          }
+        };
+      }
+    }
+    // PM field - use source platform name
+    const pmEl = document.getElementById('preview-pm');
+    if (pmEl) pmEl.textContent = info.source || currentSite.name;
+
+    // Show file count in attachments field
+    const attEl = document.getElementById('preview-attachments');
+    if (attEl) attEl.textContent = count > 0 ? `${count} file(s)` : 'none found';
+
+    // Thread field - show platform URL
+    const threadEl = document.getElementById('preview-thread');
+    if (threadEl) threadEl.textContent = info.source || currentSite.name;
+
+    const hasInfo = info.projectName || info.gc || info.bidDate || info.location;
+    const statusMsg = hasInfo
+      ? `${info.projectName || currentSite.name} - ${count} doc(s)`
+      : `${count} document(s) found`;
+    setStatus('ready', statusMsg);
     showToast(`Found ${count} document(s) on ${currentSite.name}`, 'success');
     flashButtonSuccess(extractBtn);
 
-    displayDownloadLinks(docs.map(doc => ({
-      url: doc.url,
-      platform: currentSite.name,
-      icon: doc.type === 'CAD Drawing' ? '\uD83D\uDCD0' : '\uD83D\uDCC4',
-      text: doc.name,
-      type: 'file'
-    })));
+    // Show document links
+    if (count > 0) {
+      displayDownloadLinks(docs.map(doc => ({
+        url: doc.url,
+        platform: currentSite.name,
+        icon: doc.type === 'CAD Drawing' ? '\uD83D\uDCD0' : '\uD83D\uDCC4',
+        text: doc.name,
+        type: 'file'
+      })));
+    }
 
     previewSection.classList.remove('hidden');
+
+    // Store for copy/calendar/download functions
+    currentExtraction = {
+      project: info.projectName || '',
+      gc: info.gc || '',
+      bidDate: info.bidDate || '',
+      bidTime: info.bidTime || '',
+      location: info.location || '',
+      scope: info.scope || '',
+      notes: info.notes || '',
+      attachments: docs.map(d => d.name),
+      source: info.source || currentSite.name
+    };
 
     downloadBtn.onclick = async () => {
       setButtonLoading(downloadBtn);

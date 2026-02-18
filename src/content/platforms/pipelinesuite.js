@@ -19,7 +19,8 @@
     switch (request.action) {
       case 'extractDocuments':
         extractDocuments().then(docs => {
-          sendResponse({ success: true, documents: docs });
+          const info = extractProjectInfo();
+          sendResponse({ success: true, documents: docs, projectInfo: info });
         }).catch(err => {
           sendResponse({ success: false, error: err.message });
         });
@@ -90,6 +91,66 @@
     }
 
     return 'Unknown Project';
+  }
+
+  // Extract bid/project info from PipelineSuite page
+  function extractProjectInfo() {
+    const info = {
+      projectName: getProjectName(),
+      gc: '',
+      bidDate: '',
+      bidTime: '',
+      location: '',
+      scope: '',
+      notes: '',
+      source: 'PipelineSuite',
+      url: window.location.href
+    };
+
+    // PipelineSuite has #projectInfo table with labeled rows
+    const tables = document.querySelectorAll('#projectInfo table, #projectInfo, table');
+    const labelMap = {};
+    tables.forEach(table => {
+      table.querySelectorAll('tr').forEach(row => {
+        const cells = row.querySelectorAll('td, th');
+        for (let i = 0; i < cells.length - 1; i++) {
+          const label = cells[i].textContent.trim().toLowerCase().replace(/:$/, '');
+          const value = cells[i + 1].textContent.trim();
+          if (value) labelMap[label] = value;
+        }
+      });
+    });
+
+    // Map labels to fields
+    const gcKeys = ['general contractor', 'gc', 'company', 'owner', 'invited by', 'contractor'];
+    const dateKeys = ['bid date', 'due date', 'deadline', 'bid due', 'response date'];
+    const timeKeys = ['bid time', 'due time', 'time'];
+    const locKeys = ['location', 'address', 'city', 'project location', 'site address', 'project city'];
+    const scopeKeys = ['scope', 'trade', 'division', 'bid package', 'work type', 'csi'];
+
+    for (const [label, value] of Object.entries(labelMap)) {
+      if (!info.gc && gcKeys.some(k => label.includes(k))) info.gc = value;
+      if (!info.bidDate && dateKeys.some(k => label.includes(k))) info.bidDate = value;
+      if (!info.bidTime && timeKeys.some(k => label.includes(k))) info.bidTime = value;
+      if (!info.location && locKeys.some(k => label.includes(k))) info.location = value;
+      if (!info.scope && scopeKeys.some(k => label.includes(k))) info.scope = value;
+    }
+
+    // Notes - check #projectContacts, description areas, or fall back to text patterns
+    const noteEls = document.querySelectorAll('#projectContacts, [id*="description"], [id*="notes"], [id*="message"]');
+    const noteTexts = [];
+    noteEls.forEach(el => {
+      const t = el.innerText?.trim();
+      if (t && t.length > 10 && t.length < 2000) noteTexts.push(t);
+    });
+    if (noteTexts.length === 0) {
+      const text = document.body?.innerText || '';
+      const descMatch = text.match(/(?:description|notes|message|instructions)[:\s]+([^\n].{10,1500})/im);
+      if (descMatch) noteTexts.push(descMatch[1].trim());
+    }
+    info.notes = noteTexts.slice(0, 5).join('\n---\n');
+
+    return info;
   }
 
   // Build the native "Download All Files" ZIP URL

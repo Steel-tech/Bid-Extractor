@@ -22,7 +22,8 @@
     switch (request.action) {
       case 'extractDocuments':
         extractDocuments().then(docs => {
-          sendResponse({ success: true, documents: docs });
+          const info = extractProjectInfo();
+          sendResponse({ success: true, documents: docs, projectInfo: info });
         }).catch(err => {
           sendResponse({ success: false, error: err.message });
         });
@@ -81,6 +82,85 @@
     }
 
     return 'Unknown Project';
+  }
+
+  // Extract bid/project info from SmartBidNet page
+  function extractProjectInfo() {
+    const text = document.body?.innerText || '';
+    const content = document.querySelector('[id*="ContentPlaceHolder"]') || document.getElementById('divBodyContent') || document.body;
+    const contentText = content?.innerText || text;
+
+    const info = {
+      projectName: getProjectName(),
+      gc: '',
+      bidDate: '',
+      bidTime: '',
+      location: '',
+      scope: '',
+      notes: '',
+      source: 'SmartBid',
+      url: window.location.href
+    };
+
+    // GC - SmartBidNet labels: "General Contractor", "Company", "Owner"
+    const gcEl = document.querySelector('[id*="lblCompany"], [id*="lblGC"], [id*="lblOwner"], [id*="lblContractor"]');
+    if (gcEl?.textContent?.trim()) {
+      info.gc = gcEl.textContent.trim();
+    } else {
+      const gcMatch = contentText.match(/(?:general contractor|gc|company|owner|invited by)[:\s]+([^\n]{3,60})/im);
+      if (gcMatch) info.gc = gcMatch[1].trim();
+    }
+
+    // Bid date - SmartBidNet labels or text patterns
+    const dateEl = document.querySelector('[id*="lblBidDate"], [id*="lblDueDate"], [id*="lblDeadline"]');
+    if (dateEl?.textContent?.trim()) {
+      info.bidDate = dateEl.textContent.trim();
+    } else {
+      const dateMatch = contentText.match(/(?:bid date|due date|deadline|bid due)[:\s]+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})/im);
+      if (dateMatch) info.bidDate = dateMatch[1].trim();
+    }
+
+    // Bid time
+    const timeEl = document.querySelector('[id*="lblBidTime"], [id*="lblDueTime"]');
+    if (timeEl?.textContent?.trim()) {
+      info.bidTime = timeEl.textContent.trim();
+    } else {
+      const timeMatch = contentText.match(/(?:bid time|due time|due by|time)[:\s]+(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?(?:\s*[A-Z]{2,4})?)/im);
+      if (timeMatch) info.bidTime = timeMatch[1].trim();
+    }
+
+    // Location
+    const locEl = document.querySelector('[id*="lblLocation"], [id*="lblAddress"], [id*="lblCity"], [id*="lblProjectLocation"]');
+    if (locEl?.textContent?.trim()) {
+      info.location = locEl.textContent.trim();
+    } else {
+      const locMatch = contentText.match(/(?:location|address|city|project location|site address)[:\s]+([^\n]{5,80})/im);
+      if (locMatch) info.location = locMatch[1].trim();
+    }
+
+    // Scope
+    const scopeEl = document.querySelector('[id*="lblScope"], [id*="lblTrade"], [id*="lblDivision"], [id*="lblBidPackage"]');
+    if (scopeEl?.textContent?.trim()) {
+      info.scope = scopeEl.textContent.trim();
+    } else {
+      const scopeMatch = contentText.match(/(?:scope|trade|division|bid package|work type)[:\s]+([^\n]{3,120})/im);
+      if (scopeMatch) info.scope = scopeMatch[1].trim();
+    }
+
+    // Notes / messages
+    const noteEls = document.querySelectorAll('[id*="lblNotes"], [id*="lblDescription"], [id*="lblMessage"], [id*="txtNotes"], [id*="divNotes"], [id*="divDescription"]');
+    const noteTexts = [];
+    noteEls.forEach(el => {
+      const t = el.innerText?.trim();
+      if (t && t.length > 5) noteTexts.push(t);
+    });
+    if (noteTexts.length === 0) {
+      const descMatch = contentText.match(/(?:description|notes|message|instructions)[:\s]+([^\n].{10,1500})/im);
+      if (descMatch) noteTexts.push(descMatch[1].trim());
+    }
+    info.notes = noteTexts.slice(0, 5).join('\n---\n');
+
+    return info;
   }
 
   // Extract all documents from the page
