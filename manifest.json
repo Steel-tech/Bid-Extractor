@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bid Extractor",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Matrix-themed bid extraction with priority scoring, dashboard stats, and digital rain animation. Extract RFQ data from Gmail, Outlook, BuildingConnected, PlanHub, Procore.",
   "permissions": [
     "activeTab",
@@ -41,7 +41,7 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/gmail.js"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/email-parser.js", "src/content/gmail.js"],
       "css": ["src/content/content.css"]
     },
     {
@@ -51,7 +51,7 @@
         "https://outlook.office365.com/*",
         "https://*.outlook.com/*"
       ],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/outlook.js"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/email-parser.js", "src/content/outlook.js"],
       "css": ["src/content/content.css"]
     },
     {

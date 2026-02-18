@@ -868,6 +868,20 @@ const EmailParser = {
   },
 
   /**
+   * Orchestrate all sub-parsers into a single structured result.
+   * @param {string} text - Full email body text
+   * @returns {{ signature: object, sections: object, thread: Array, metadata: object }}
+   */
+  parseFullEmail(text) {
+    return {
+      signature: this.extractSignature(text),
+      sections: this.identifySections(text),
+      thread: this.extractThreadMessages(text),
+      metadata: this.extractMetadata(text),
+    };
+  },
+
+  /**
    * Extract bond requirement text.
    * Finds lines mentioning "bid bond", "performance bond", or "payment bond"
    * and collects surrounding context.

@@ -281,3 +281,55 @@ Performance and payment bond will be required at 100%.`;
     expect(meta.preBidMeeting.date).toBe('');
   });
 });
+
+describe('EmailParser.parseFullEmail', () => {
+  test('combines all parsers into structured output', () => {
+    const text = `Dear Subcontractor,
+
+We are requesting bids for the following project.
+
+Project Name: Dallas Medical Center Expansion
+Location: 1234 Main St, Dallas, TX 75201
+Project Manager: Sarah Johnson
+
+Scope of Work:
+Structural steel, misc metals, steel deck.
+Approximately 500 tons.
+
+Submission Instructions:
+Submit via BuildingConnected by 2:00 PM CST on Feb 25, 2026.
+
+Pre-Bid Meeting:
+Date: February 18, 2026 at 10:00 AM
+Location: Project Site
+Attendance is mandatory.
+
+Best regards,
+John Smith
+Senior PM
+Turner Construction
+jsmith@turner.com
+(555) 123-4567`;
+
+    const result = EmailParser.parseFullEmail(text);
+
+    // Signature
+    expect(result.signature.name).toBe('John Smith');
+    expect(result.signature.company).toBe('Turner Construction');
+
+    // Sections
+    expect(result.sections.project).toBe('Dallas Medical Center Expansion');
+    expect(result.sections.scope.toLowerCase()).toContain('structural steel');
+
+    // Metadata
+    expect(result.metadata.bidTime).toBe('2:00 PM CST');
+    expect(result.metadata.projectManager).toBe('Sarah Johnson');
+    expect(result.metadata.preBidMeeting.mandatory).toBe(true);
+
+    // Thread (single message)
+    expect(result.thread.length).toBe(1);
+
+    // General notes
+    expect(result.sections.generalNotes.length).toBeGreaterThan(0);
+  });
+});
