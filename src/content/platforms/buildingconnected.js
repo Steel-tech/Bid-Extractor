@@ -226,8 +226,6 @@
     const docsTabs = document.querySelectorAll([
       '[data-testid*="documents"]',
       '[data-testid*="files"]',
-      'button:contains("Documents")',
-      'a:contains("Documents")',
       '[role="tab"]'
     ].join(', '));
 
