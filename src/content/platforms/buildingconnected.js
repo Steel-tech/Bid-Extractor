@@ -79,145 +79,81 @@
   async function extractDocuments() {
     console.log('🔍 Extracting documents from BuildingConnected...');
     extractedDocuments = [];
+    const seen = new Set();
 
-    // Wait for dynamic content to load
+    function addDoc(doc) {
+      const key = doc.url || doc.name;
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        extractedDocuments.push(doc);
+      }
+    }
+
+    // Wait for SPA content to render
     await waitForContent();
 
-    // Strategy 1: Find document list/table rows
-    const documentRows = document.querySelectorAll([
-      '[data-testid*="document"]',
-      '[data-testid*="file"]',
-      '[class*="DocumentRow"]',
-      '[class*="FileRow"]',
-      '[class*="document-row"]',
-      '[class*="file-item"]',
-      'tr[class*="document"]',
-      'tr[class*="file"]',
-      '.file-list-item',
-      '.document-list-item'
-    ].join(', '));
-
-    documentRows.forEach(row => {
-      const doc = extractDocumentFromRow(row);
-      if (doc) extractedDocuments.push(doc);
-    });
-
-    // Strategy 2: Find all download links/buttons
-    const downloadElements = document.querySelectorAll([
-      'a[href*="download"]',
-      'a[href*=".pdf"]',
-      'a[href*=".dwg"]',
-      'a[href*=".dxf"]',
-      'a[href*=".xlsx"]',
-      'a[href*=".xls"]',
-      'a[href*=".doc"]',
-      'a[href*=".zip"]',
-      'button[data-testid*="download"]',
-      '[role="button"][class*="download"]',
-      'a[download]'
-    ].join(', '));
-
-    downloadElements.forEach(el => {
-      const doc = extractDocumentFromLink(el);
-      if (doc && !extractedDocuments.find(d => d.url === doc.url)) {
-        extractedDocuments.push(doc);
+    // Strategy 1: Every <a> on the page - check href and text for file references
+    document.querySelectorAll('a[href]').forEach(el => {
+      const href = el.href || '';
+      const text = (el.textContent || '').trim();
+      const download = el.getAttribute('download') || '';
+      if (isRelevantFile(text) || isRelevantFile(download) || isRelevantUrl(href)) {
+        addDoc({
+          name: download || text || extractFilenameFromUrl(href),
+          url: href,
+          type: getFileType(download || text || href),
+          source: 'BuildingConnected'
+        });
       }
     });
 
-    // Strategy 3: Look for file icons with adjacent text
-    const fileIcons = document.querySelectorAll([
-      '[class*="FileIcon"]',
-      '[class*="file-icon"]',
-      'svg[class*="document"]',
-      'svg[class*="pdf"]',
-      'img[src*="pdf"]',
-      'img[src*="file"]'
-    ].join(', '));
-
-    fileIcons.forEach(icon => {
-      const parent = icon.closest('a, button, [role="button"], tr, li, .file-item, .document-item');
-      if (parent) {
-        const doc = extractDocumentFromContainer(parent);
-        if (doc && !extractedDocuments.find(d => d.name === doc.name)) {
-          extractedDocuments.push(doc);
+    // Strategy 2: Buttons with download-related attributes or text
+    document.querySelectorAll('button, [role="button"]').forEach(el => {
+      const text = (el.textContent || '').trim().toLowerCase();
+      const url = el.dataset?.url || el.dataset?.href || '';
+      if (text.includes('download') || url) {
+        if (isRelevantUrl(url) || isRelevantFile(text)) {
+          addDoc({
+            name: text || extractFilenameFromUrl(url),
+            url: url,
+            type: getFileType(text || url),
+            source: 'BuildingConnected'
+          });
         }
       }
     });
 
-    // Strategy 4: Find Documents tab/section and extract from there
+    // Strategy 3: Walk the page text looking for file-name patterns in any element
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const text = walker.currentNode.textContent.trim();
+      const fileMatch = text.match(/[\w\s._-]+\.(pdf|dwg|dxf|xlsx?|docx?|zip|rar)/gi);
+      if (fileMatch) {
+        fileMatch.forEach(name => {
+          const closestLink = walker.currentNode.parentElement?.closest('a[href]');
+          addDoc({
+            name: name.trim(),
+            url: closestLink?.href || '',
+            type: getFileType(name),
+            source: 'BuildingConnected'
+          });
+        });
+      }
+    }
+
+    // Strategy 4: Click Documents/Files tab if not active, re-scan
     await extractFromDocumentsSection();
 
+    // Log diagnostic info for debugging
     console.log(`📄 Found ${extractedDocuments.length} documents`);
+    if (extractedDocuments.length === 0) {
+      console.log('🔎 DOM diagnostic - total links:', document.querySelectorAll('a').length);
+      console.log('🔎 DOM diagnostic - total buttons:', document.querySelectorAll('button').length);
+      console.log('🔎 DOM diagnostic - iframes:', document.querySelectorAll('iframe').length);
+      console.log('🔎 DOM diagnostic - page text length:', document.body?.innerText?.length);
+    }
+
     return extractedDocuments;
-  }
-
-  // Extract document info from a table row
-  function extractDocumentFromRow(row) {
-    const nameEl = row.querySelector([
-      '[class*="name"]',
-      '[class*="Name"]',
-      'td:first-child',
-      'span',
-      'a'
-    ].join(', '));
-
-    const linkEl = row.querySelector('a[href], button[data-url]');
-    const name = nameEl?.textContent?.trim();
-    const url = linkEl?.href || linkEl?.dataset?.url;
-
-    if (name && isRelevantFile(name)) {
-      return {
-        name: name,
-        url: url || '',
-        type: getFileType(name),
-        size: extractFileSize(row),
-        source: 'BuildingConnected'
-      };
-    }
-    return null;
-  }
-
-  // Extract document info from a link element
-  function extractDocumentFromLink(el) {
-    const url = el.href || el.dataset?.url || '';
-    let name = el.textContent?.trim() || el.getAttribute('download') || '';
-
-    // Try to extract filename from URL
-    if (!name || name.length < 3) {
-      const urlParts = url.split('/');
-      name = decodeURIComponent(urlParts[urlParts.length - 1].split('?')[0]);
-    }
-
-    if (url && isRelevantFile(name) || isRelevantUrl(url)) {
-      return {
-        name: name || 'document',
-        url: url,
-        type: getFileType(name || url),
-        source: 'BuildingConnected'
-      };
-    }
-    return null;
-  }
-
-  // Extract document from a container element
-  function extractDocumentFromContainer(container) {
-    const textContent = container.textContent?.trim() || '';
-    const linkEl = container.querySelector('a[href]') || container.closest('a[href]');
-    const url = linkEl?.href || '';
-
-    // Find filename-like text
-    const fileMatch = textContent.match(/[\w\s-]+\.(pdf|dwg|dxf|xlsx?|docx?|zip)/i);
-    const name = fileMatch ? fileMatch[0] : textContent.substring(0, 100);
-
-    if (isRelevantFile(name) || isRelevantUrl(url)) {
-      return {
-        name: name,
-        url: url,
-        type: getFileType(name),
-        source: 'BuildingConnected'
-      };
-    }
-    return null;
   }
 
   // Look for Documents tab and click it to extract documents
@@ -244,24 +180,23 @@
     }
   }
 
-  // Extract documents from currently visible content
+  // Re-scan after tab click
   async function extractVisibleDocuments() {
-    const allLinks = document.querySelectorAll('a[href]');
-
-    allLinks.forEach(link => {
+    const seen = new Set(extractedDocuments.map(d => d.url || d.name));
+    document.querySelectorAll('a[href]').forEach(link => {
       const href = link.href || '';
-      const text = link.textContent?.trim() || '';
-
-      if (isRelevantFile(text) || isRelevantUrl(href)) {
-        const doc = {
-          name: text || extractFilenameFromUrl(href),
-          url: href,
-          type: getFileType(text || href),
-          source: 'BuildingConnected'
-        };
-
-        if (!extractedDocuments.find(d => d.url === doc.url || d.name === doc.name)) {
-          extractedDocuments.push(doc);
+      const text = (link.textContent || '').trim();
+      const download = link.getAttribute('download') || '';
+      if (isRelevantFile(text) || isRelevantFile(download) || isRelevantUrl(href)) {
+        const key = href || text;
+        if (!seen.has(key)) {
+          seen.add(key);
+          extractedDocuments.push({
+            name: download || text || extractFilenameFromUrl(href),
+            url: href,
+            type: getFileType(download || text || href),
+            source: 'BuildingConnected'
+          });
         }
       }
     });
@@ -357,13 +292,6 @@
     return types[ext] || 'Document';
   }
 
-  // Helper: Extract file size from element
-  function extractFileSize(element) {
-    const text = element.textContent || '';
-    const sizeMatch = text.match(/(\d+(?:\.\d+)?)\s*(KB|MB|GB)/i);
-    return sizeMatch ? `${sizeMatch[1]} ${sizeMatch[2]}` : '';
-  }
-
   // Helper: Extract filename from URL
   function extractFilenameFromUrl(url) {
     try {
@@ -383,22 +311,16 @@
       .substring(0, 100);
   }
 
-  // Helper: Wait for dynamic content
+  // Helper: Wait for SPA content to render
   async function waitForContent(timeout = 3000) {
     return new Promise(resolve => {
       let elapsed = 0;
       const interval = setInterval(() => {
         elapsed += 200;
-        // Check if content has loaded
-        const hasContent = document.querySelector([
-          '[class*="document"]',
-          '[class*="file"]',
-          '[data-testid*="document"]',
-          'table',
-          '.file-list'
-        ].join(', '));
-
-        if (hasContent || elapsed >= timeout) {
+        // Page has content when body has meaningful text or links exist
+        const hasLinks = document.querySelectorAll('a[href]').length > 5;
+        const hasText = (document.body?.innerText?.length || 0) > 500;
+        if ((hasLinks || hasText) || elapsed >= timeout) {
           clearInterval(interval);
           resolve();
         }
