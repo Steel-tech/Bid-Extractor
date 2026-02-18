@@ -457,17 +457,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkCurrentTab();
 });
 
-// Check if we're on a supported email page
+// Platform detection - maps URL patterns to site type and message action
+const PLATFORM_SITES = [
+  { pattern: 'mail.google.com', type: 'email', name: 'Gmail', action: 'extract' },
+  { pattern: 'outlook.live.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'outlook.office.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'outlook.office365.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'buildingconnected.com', type: 'platform', name: 'BuildingConnected', action: 'extractDocuments' },
+  { pattern: 'planhub.com', type: 'platform', name: 'PlanHub', action: 'extractDocuments' },
+  { pattern: 'procore.com', type: 'platform', name: 'Procore', action: 'extractDocuments' },
+  { pattern: 'smartbidnet.com', type: 'platform', name: 'SmartBid', action: 'extractDocuments' },
+  { pattern: 'pipelinesuite.com', type: 'platform', name: 'PipelineSuite', action: 'extractDocuments' },
+];
+
+let currentSite = null;
+
+// Check if we're on a supported site
 async function checkCurrentTab() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = tab?.url || '';
 
-    if (url.includes('mail.google.com') || url.includes('outlook')) {
-      setStatus('ready', 'Ready');
+    currentSite = PLATFORM_SITES.find(s => url.includes(s.pattern)) || null;
+
+    if (currentSite) {
+      setStatus('ready', currentSite.name);
       extractBtn.disabled = false;
+      const btnLabel = currentSite.type === 'email' ? 'extract from email' : 'scan documents';
+      extractBtn.querySelector('svg').nextSibling.textContent = ` ${btnLabel}`;
     } else {
-      setStatus('error', 'Open Gmail or Outlook');
+      setStatus('error', 'Open a supported site');
       extractBtn.disabled = true;
     }
   } catch (error) {
@@ -485,13 +504,13 @@ function setStatus(type, text) {
 
 // Extract button click
 extractBtn.addEventListener('click', async () => {
+  if (!currentSite) return;
+
   setStatus('loading', 'Extracting...');
   setButtonLoading(extractBtn);
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    console.log('Current tab:', tab?.url);
-
     if (!tab?.id) {
       setStatus('error', 'Cannot access tab');
       clearButtonLoading(extractBtn);
@@ -499,60 +518,18 @@ extractBtn.addEventListener('click', async () => {
       return;
     }
 
-    // Send message to content script
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'extract' });
-    console.log('Response from content script:', response);
+    const response = await chrome.tabs.sendMessage(tab.id, { action: currentSite.action });
 
-    if (response?.success) {
-      currentExtraction = response.data;
-      displayExtraction(currentExtraction);
-      await saveExtraction(currentExtraction);
-
-      // AUTO-DOWNLOAD files immediately after extraction
-      try {
-        const settings = await chrome.storage.local.get(['folderPattern', 'createSummary']);
-        // Default: GC Name + Bid Date + Project (Company first, then date)
-        const folderPattern = settings.folderPattern || 'Bids/{gc}_{date}_{project}';
-        const folderName = createFolderName(folderPattern, currentExtraction);
-
-        // 1. Create the summary text file
-        const summaryContent = createSummaryText(currentExtraction);
-        const summaryBlob = new Blob([summaryContent], { type: 'text/plain' });
-        const summaryUrl = URL.createObjectURL(summaryBlob);
-        await downloadFile(summaryUrl, `${folderName}/bid_info.txt`);
-        URL.revokeObjectURL(summaryUrl);
-
-        // 2. Create the Project Info Sheet HTML (opens in Word, Google Docs, or browser)
-        const projectInfoHtml = createProjectInfoSheet(currentExtraction);
-        const htmlBlob = new Blob([projectInfoHtml], { type: 'text/html' });
-        const htmlUrl = URL.createObjectURL(htmlBlob);
-        await downloadFile(htmlUrl, `${folderName}/Project_Info_Sheet.html`);
-        URL.revokeObjectURL(htmlUrl);
-
-        console.log('Files saved to:', folderName);
-        setStatus('ready', 'Extracted & Saved!');
-        showToast(`Bid extracted: ${currentExtraction.project || 'Unknown'}`, 'success');
-        flashButtonSuccess(extractBtn);
-      } catch (downloadErr) {
-        console.error('Auto-download failed:', downloadErr);
-        setStatus('ready', 'Extracted! Click Download to save.');
-        showToast('Extracted! Auto-download failed.', 'warning');
-      }
+    if (currentSite.type === 'email') {
+      handleEmailResponse(response);
     } else {
-      setStatus('error', response?.error || 'Extraction failed');
-      showToast(response?.error || 'Extraction failed', 'error');
-      extractBtn.classList.add('shake');
-      setTimeout(() => extractBtn.classList.remove('shake'), 400);
+      handlePlatformResponse(response);
     }
   } catch (error) {
     console.error('Extraction error:', error);
-    // More helpful error messages
     if (error.message?.includes('Receiving end does not exist')) {
-      setStatus('error', 'Refresh Gmail page first');
-      showToast('Refresh the email page first', 'error');
-    } else if (error.message?.includes('Cannot access')) {
-      setStatus('error', 'Cannot access this page');
-      showToast('Cannot access this page', 'error');
+      setStatus('error', 'Refresh page first');
+      showToast('Refresh the page first', 'error');
     } else {
       setStatus('error', error.message || 'Try refreshing page');
       showToast(error.message || 'Try refreshing the page', 'error');
@@ -563,6 +540,85 @@ extractBtn.addEventListener('click', async () => {
 
   clearButtonLoading(extractBtn);
 });
+
+function handleEmailResponse(response) {
+  if (response?.success) {
+    currentExtraction = response.data;
+    displayExtraction(currentExtraction);
+    saveExtraction(currentExtraction);
+
+    (async () => {
+      try {
+        const settings = await chrome.storage.local.get(['folderPattern', 'createSummary']);
+        const folderPattern = settings.folderPattern || 'Bids/{gc}_{date}_{project}';
+        const folderName = createFolderName(folderPattern, currentExtraction);
+
+        const summaryContent = createSummaryText(currentExtraction);
+        const summaryBlob = new Blob([summaryContent], { type: 'text/plain' });
+        const summaryUrl = URL.createObjectURL(summaryBlob);
+        await downloadFile(summaryUrl, `${folderName}/bid_info.txt`);
+        URL.revokeObjectURL(summaryUrl);
+
+        const projectInfoHtml = createProjectInfoSheet(currentExtraction);
+        const htmlBlob = new Blob([projectInfoHtml], { type: 'text/html' });
+        const htmlUrl = URL.createObjectURL(htmlBlob);
+        await downloadFile(htmlUrl, `${folderName}/Project_Info_Sheet.html`);
+        URL.revokeObjectURL(htmlUrl);
+
+        setStatus('ready', 'Extracted & Saved!');
+        showToast(`Bid extracted: ${currentExtraction.project || 'Unknown'}`, 'success');
+        flashButtonSuccess(extractBtn);
+      } catch (downloadErr) {
+        console.error('Auto-download failed:', downloadErr);
+        setStatus('ready', 'Extracted!');
+        showToast('Extracted! Auto-download failed.', 'warning');
+      }
+    })();
+  } else {
+    setStatus('error', response?.error || 'Extraction failed');
+    showToast(response?.error || 'Extraction failed', 'error');
+    extractBtn.classList.add('shake');
+    setTimeout(() => extractBtn.classList.remove('shake'), 400);
+  }
+}
+
+function handlePlatformResponse(response) {
+  if (response?.success && response.documents) {
+    const docs = response.documents;
+    const count = docs.length;
+
+    setStatus('ready', `${count} document(s) found`);
+    showToast(`Found ${count} document(s) on ${currentSite.name}`, 'success');
+    flashButtonSuccess(extractBtn);
+
+    displayDownloadLinks(docs.map(doc => ({
+      url: doc.url,
+      platform: currentSite.name,
+      icon: doc.type === 'CAD Drawing' ? '\uD83D\uDCD0' : '\uD83D\uDCC4',
+      text: doc.name,
+      type: 'file'
+    })));
+
+    previewSection.classList.remove('hidden');
+
+    downloadBtn.onclick = async () => {
+      setButtonLoading(downloadBtn);
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const result = await chrome.tabs.sendMessage(tab.id, { action: 'downloadAllDocuments' });
+        setStatus('ready', `Downloaded ${result.downloaded || 0} file(s)`);
+        showToast(`Downloaded ${result.downloaded || 0} file(s)`, 'success');
+        flashButtonSuccess(downloadBtn);
+      } catch (err) {
+        showToast('Download failed: ' + err.message, 'error');
+      }
+      clearButtonLoading(downloadBtn);
+    };
+  } else {
+    setStatus('error', response?.error || 'No documents found');
+    showToast(response?.error || 'No documents found on this page', 'warning');
+  }
+}
 
 // Display extracted data
 function displayExtraction(data) {
