@@ -169,3 +169,57 @@ Bid Date: March 1, 2026`;
     expect(sections.generalNotes).toBe('Quick note - bid is due Friday. Plans on BC.');
   });
 });
+
+describe('EmailParser.extractThreadMessages', () => {
+  test('extracts messages from "On ... wrote:" thread', () => {
+    const text = `Here is the updated scope.
+
+Best regards,
+John
+
+On Mon, Feb 10, 2026 at 3:15 PM Jane Doe <jane@turner.com> wrote:
+> Hi John,
+> Can you send the updated drawings?
+> Thanks,
+> Jane
+
+On Fri, Feb 7, 2026 at 9:00 AM John Smith <john@steelco.com> wrote:
+> Attached are the initial plans for review.
+> Let me know if you have questions.`;
+
+    const messages = EmailParser.extractThreadMessages(text);
+    expect(messages.length).toBe(3);
+    expect(messages[0].body).toContain('updated scope');
+    expect(messages[1].sender).toContain('Jane Doe');
+    expect(messages[1].body).toContain('updated drawings');
+    expect(messages[2].sender).toContain('John Smith');
+  });
+
+  test('extracts from forwarded message', () => {
+    const text = `FYI - see below for the original RFQ.
+
+---------- Forwarded message ---------
+From: Mark Wilson <mark@gccompany.com>
+Date: Wed, Feb 5, 2026 at 10:30 AM
+Subject: RFQ - Steel Package
+
+Please bid on the attached steel package.`;
+
+    const messages = EmailParser.extractThreadMessages(text);
+    expect(messages.length).toBe(2);
+    expect(messages[1].sender).toContain('Mark Wilson');
+    expect(messages[1].body).toContain('steel package');
+  });
+
+  test('returns single message for non-threaded email', () => {
+    const text = 'Please submit your bid by Friday.';
+    const messages = EmailParser.extractThreadMessages(text);
+    expect(messages.length).toBe(1);
+    expect(messages[0].body).toContain('submit your bid');
+  });
+
+  test('handles empty input', () => {
+    expect(EmailParser.extractThreadMessages('')).toEqual([]);
+    expect(EmailParser.extractThreadMessages(null)).toEqual([]);
+  });
+});

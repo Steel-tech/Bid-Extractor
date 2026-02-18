@@ -427,6 +427,250 @@ const EmailParser = {
 
     return bullets.join('\n').trim();
   },
+
+  // --- Thread message extraction ---
+
+  /**
+   * Pattern: "On <date> <name> <email> wrote:"
+   * Captures the full header line for sender/date extraction.
+   */
+  REPLY_HEADER_REGEX: /^On\s+.+\s+wrote:\s*$/m,
+
+  /**
+   * Pattern: forwarded message separator.
+   */
+  FORWARD_SEPARATOR_REGEX: /^-{5,}\s*Forwarded message\s*-{5,}\s*$/m,
+
+  /**
+   * Pattern: Outlook-style "From: ... Sent/Date: ..." header block.
+   */
+  OUTLOOK_HEADER_REGEX: /^From:\s+.+\n(?:Sent|Date):\s+.+/m,
+
+  /**
+   * Extract individual messages from an email thread.
+   * Splits at reply headers ("On ... wrote:"), forwarded message
+   * separators, and Outlook-style "From:/Sent:" blocks.
+   *
+   * @param {string} text - Full email body text (may include thread)
+   * @returns {Array<{ sender: string, date: string, body: string }>}
+   */
+  extractThreadMessages(text) {
+    if (!text || typeof text !== 'string' || text.trim() === '') {
+      return [];
+    }
+
+    const segments = this._splitThreadSegments(text);
+
+    if (segments.length === 0) {
+      return [];
+    }
+
+    return segments.map(seg => ({
+      sender: seg.sender,
+      date: seg.date,
+      body: seg.body,
+    }));
+  },
+
+  /**
+   * Split email text into thread segments at recognized boundaries.
+   * Returns an array of { sender, date, body } objects ordered
+   * newest-first (the first segment is the top-level message).
+   *
+   * @param {string} text
+   * @returns {Array<{ sender: string, date: string, body: string }>}
+   */
+  _splitThreadSegments(text) {
+    // Build a list of boundary positions with metadata
+    const boundaries = [];
+
+    // Find "On ... wrote:" boundaries
+    const replyRegex = /^(On\s+(.+?)\s+(.+?)\s+wrote:)\s*$/gm;
+    let match;
+    while ((match = replyRegex.exec(text)) !== null) {
+      const headerLine = match[1];
+      const parsed = this._parseReplyHeader(headerLine);
+      boundaries.push({
+        index: match.index,
+        headerEnd: match.index + match[0].length,
+        sender: parsed.sender,
+        date: parsed.date,
+      });
+    }
+
+    // Find forwarded message boundaries
+    const fwdRegex = /^-{5,}\s*Forwarded message\s*-{5,}\s*$/gm;
+    while ((match = fwdRegex.exec(text)) !== null) {
+      boundaries.push({
+        index: match.index,
+        headerEnd: match.index + match[0].length,
+        sender: '',
+        date: '',
+        isForward: true,
+      });
+    }
+
+    // Find Outlook-style "From: ... Sent/Date: ..." boundaries
+    // Skip any that fall within a forwarded message header region
+    const outlookRegex = /^From:\s+(.+)\n(?:Sent|Date):\s+(.+)/gm;
+    while ((match = outlookRegex.exec(text)) !== null) {
+      // Skip if this From/Date block is inside a forwarded separator's body
+      const isInsideForward = boundaries.some(
+        b => b.isForward && match.index > b.index && match.index <= b.headerEnd + 50
+      );
+      if (isInsideForward) {
+        continue;
+      }
+      boundaries.push({
+        index: match.index,
+        headerEnd: match.index + match[0].length,
+        sender: match[1].trim(),
+        date: match[2].trim(),
+      });
+    }
+
+    // No boundaries means single message
+    if (boundaries.length === 0) {
+      return [{ sender: '', date: '', body: text.trim() }];
+    }
+
+    // Sort by position in text
+    boundaries.sort((a, b) => a.index - b.index);
+
+    const segments = [];
+
+    // First segment: everything before the first boundary
+    const firstBody = text.slice(0, boundaries[0].index).trim();
+    if (firstBody) {
+      segments.push({ sender: '', date: '', body: firstBody });
+    }
+
+    // Remaining segments
+    for (let i = 0; i < boundaries.length; i++) {
+      const boundary = boundaries[i];
+      const bodyStart = boundary.headerEnd;
+      const bodyEnd = i + 1 < boundaries.length
+        ? boundaries[i + 1].index
+        : text.length;
+
+      let body = text.slice(bodyStart, bodyEnd).trim();
+
+      // For forwarded messages, extract From/Date from the body header lines
+      if (boundary.isForward) {
+        const fwdParsed = this._parseForwardedHeader(body);
+        boundary.sender = fwdParsed.sender;
+        boundary.date = fwdParsed.date;
+        body = fwdParsed.body;
+      }
+
+      // Strip ">" quote markers from replied text
+      body = this._stripQuoteMarkers(body);
+
+      segments.push({
+        sender: boundary.sender,
+        date: boundary.date,
+        body: body.trim(),
+      });
+    }
+
+    return segments;
+  },
+
+  /**
+   * Parse sender and date from "On <date info> <Name> <email> wrote:" header.
+   * @param {string} header - The full "On ... wrote:" line
+   * @returns {{ sender: string, date: string }}
+   */
+  _parseReplyHeader(header) {
+    // Remove "On " prefix and " wrote:" suffix
+    const inner = header
+      .replace(/^On\s+/, '')
+      .replace(/\s+wrote:$/i, '')
+      .trim();
+
+    // Try to extract sender with email: "Name <email>"
+    const emailBracket = inner.match(/([^<]+)<[^>]+>\s*$/);
+    if (emailBracket) {
+      const sender = emailBracket[1].trim();
+      const datePart = inner.slice(0, inner.indexOf(sender)).trim();
+      // Remove trailing comma from date if present
+      const date = datePart.replace(/,\s*$/, '').trim();
+      return { sender, date };
+    }
+
+    // Fallback: last two words are the name, rest is date
+    const parts = inner.split(/\s+/);
+    if (parts.length >= 3) {
+      const sender = parts.slice(-2).join(' ');
+      const date = parts.slice(0, -2).join(' ').replace(/,\s*$/, '').trim();
+      return { sender, date };
+    }
+
+    return { sender: inner, date: '' };
+  },
+
+  /**
+   * Parse From/Date/Subject lines from a forwarded message header block.
+   * Returns the parsed metadata and the remaining body after the headers.
+   * @param {string} text - Body text after the forwarded separator
+   * @returns {{ sender: string, date: string, body: string }}
+   */
+  _parseForwardedHeader(text) {
+    const lines = text.split('\n');
+    let sender = '';
+    let date = '';
+    let bodyStartIdx = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i].trim();
+
+      const fromMatch = line.match(/^From:\s+(.+)/i);
+      if (fromMatch) {
+        sender = fromMatch[1].trim();
+        bodyStartIdx = i + 1;
+        continue;
+      }
+
+      const dateMatch = line.match(/^Date:\s+(.+)/i);
+      if (dateMatch) {
+        date = dateMatch[1].trim();
+        bodyStartIdx = i + 1;
+        continue;
+      }
+
+      const subjectMatch = line.match(/^Subject:\s+(.+)/i);
+      if (subjectMatch) {
+        bodyStartIdx = i + 1;
+        continue;
+      }
+
+      // Once we hit a non-header line (and we've seen at least one header), stop
+      if ((sender || date) && line !== '') {
+        bodyStartIdx = i;
+        break;
+      }
+
+      // Skip blank lines between headers
+      if (line === '' && (sender || date)) {
+        bodyStartIdx = i + 1;
+      }
+    }
+
+    const body = lines.slice(bodyStartIdx).join('\n').trim();
+    return { sender, date, body };
+  },
+
+  /**
+   * Strip leading ">" quote markers from each line of text.
+   * @param {string} text
+   * @returns {string}
+   */
+  _stripQuoteMarkers(text) {
+    return text
+      .split('\n')
+      .map(line => line.replace(/^>\s?/, ''))
+      .join('\n');
+  },
 };
 
 // Dual export: Node.js (tests) and browser (content script)
