@@ -59,7 +59,39 @@ const elements = {
   filenameSpan: document.getElementById('filename'),
 
   // Toast container
-  toastContainer: document.getElementById('toast-container')
+  toastContainer: document.getElementById('toast-container'),
+
+  // Takeoff Panel
+  takeoffToggle: document.getElementById('takeoff-toggle'),
+  takeoffPanel: document.getElementById('takeoff-panel'),
+  closeTakeoff: document.getElementById('close-takeoff'),
+  memberInput: document.getElementById('member-input'),
+  memberSuggestions: document.getElementById('member-suggestions'),
+  lengthInput: document.getElementById('length-input'),
+  qtyInput: document.getElementById('qty-input'),
+  markInput: document.getElementById('mark-input'),
+  addItemBtn: document.getElementById('add-item-btn'),
+  takeoffItems: document.getElementById('takeoff-items'),
+  emptyTakeoff: document.getElementById('empty-takeoff'),
+  totalItems: document.getElementById('total-items'),
+  totalLength: document.getElementById('total-length'),
+  totalWeight: document.getElementById('total-weight'),
+  totalTons: document.getElementById('total-tons'),
+  exportCsv: document.getElementById('export-csv'),
+  clearTakeoff: document.getElementById('clear-takeoff'),
+
+  // Auto-Detect Modal
+  autoDetectBtn: document.getElementById('auto-detect-btn'),
+  detectModal: document.getElementById('detect-modal'),
+  closeDetectModal: document.getElementById('close-detect-modal'),
+  detectLoading: document.getElementById('detect-loading'),
+  detectResults: document.getElementById('detect-results'),
+  detectCount: document.getElementById('detect-count'),
+  selectAllBtn: document.getElementById('select-all-btn'),
+  detectedList: document.getElementById('detected-list'),
+  detectEmpty: document.getElementById('detect-empty'),
+  cancelDetect: document.getElementById('cancel-detect'),
+  addSelectedBtn: document.getElementById('add-selected-btn')
 };
 
 // ===== INITIALIZATION =====
@@ -95,6 +127,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Initialize annotation system
   if (typeof AnnotationManager !== 'undefined') {
     AnnotationManager.init(elements.annotationCanvas, ViewerState);
+  }
+
+  // Initialize takeoff system
+  if (typeof TakeoffManager !== 'undefined') {
+    await TakeoffManager.init(ViewerState.filename);
+    updateTakeoffUI();
   }
 });
 
@@ -364,6 +402,90 @@ function initEventListeners() {
       renderPage(ViewerState.currentPage);
     }
   }, 200));
+
+  // ===== TAKEOFF EVENT LISTENERS =====
+  // Toggle takeoff panel
+  elements.takeoffToggle?.addEventListener('click', () => {
+    elements.takeoffPanel?.classList.toggle('hidden');
+    elements.dataPanel?.classList.add('hidden'); // Close data panel
+  });
+
+  // Close takeoff panel
+  elements.closeTakeoff?.addEventListener('click', () => {
+    elements.takeoffPanel?.classList.add('hidden');
+  });
+
+  // Member input with suggestions
+  elements.memberInput?.addEventListener('input', (e) => {
+    const query = e.target.value.trim().toUpperCase();
+    if (query.length >= 2 && typeof SteelDatabase !== 'undefined') {
+      const results = SteelDatabase.searchShapes(query, 8);
+      showMemberSuggestions(results);
+    } else {
+      hideMemberSuggestions();
+    }
+  });
+
+  elements.memberInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      hideMemberSuggestions();
+      addTakeoffItem();
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      selectNextSuggestion();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      selectPrevSuggestion();
+    } else if (e.key === 'Escape') {
+      hideMemberSuggestions();
+    }
+  });
+
+  // Add item button
+  elements.addItemBtn?.addEventListener('click', addTakeoffItem);
+
+  // Export CSV
+  elements.exportCsv?.addEventListener('click', exportTakeoffCSV);
+
+  // Clear all
+  elements.clearTakeoff?.addEventListener('click', () => {
+    if (confirm('Clear all takeoff items?')) {
+      if (typeof TakeoffManager !== 'undefined') {
+        TakeoffManager.clearAll();
+        updateTakeoffUI();
+        showToast('Takeoff cleared', 'success');
+      }
+    }
+  });
+
+  // Close suggestions when clicking outside
+  document.addEventListener('click', (e) => {
+    if (!elements.memberInput?.contains(e.target) && !elements.memberSuggestions?.contains(e.target)) {
+      hideMemberSuggestions();
+    }
+  });
+
+  // ===== AUTO-DETECT EVENT LISTENERS =====
+  // Auto-detect button
+  elements.autoDetectBtn?.addEventListener('click', startAutoDetect);
+
+  // Close detect modal
+  elements.closeDetectModal?.addEventListener('click', closeDetectModal);
+  elements.cancelDetect?.addEventListener('click', closeDetectModal);
+
+  // Select all button
+  elements.selectAllBtn?.addEventListener('click', toggleSelectAll);
+
+  // Add selected members
+  elements.addSelectedBtn?.addEventListener('click', addSelectedMembers);
+
+  // Close modal on backdrop click
+  elements.detectModal?.addEventListener('click', (e) => {
+    if (e.target === elements.detectModal) {
+      closeDetectModal();
+    }
+  });
 }
 
 function handleKeyboardShortcuts(e) {
@@ -691,3 +813,392 @@ function initDigitalRain() {
 
 // Export for annotation save button
 document.getElementById('save-annotations')?.addEventListener('click', saveAnnotations);
+
+// ===== STEEL TAKEOFF FUNCTIONS =====
+function showMemberSuggestions(results) {
+  if (!elements.memberSuggestions || results.length === 0) {
+    hideMemberSuggestions();
+    return;
+  }
+
+  elements.memberSuggestions.innerHTML = results.map((item, index) => `
+    <div class="suggestion-item${index === 0 ? ' active' : ''}" data-shape="${item.shape}" data-weight="${item.weight}">
+      <span>${item.shape}</span>
+      <span class="weight">${item.weight} lbs/ft</span>
+    </div>
+  `).join('');
+
+  elements.memberSuggestions.classList.remove('hidden');
+
+  // Add click handlers
+  elements.memberSuggestions.querySelectorAll('.suggestion-item').forEach(item => {
+    item.addEventListener('click', () => {
+      elements.memberInput.value = item.dataset.shape;
+      hideMemberSuggestions();
+      elements.lengthInput?.focus();
+    });
+  });
+}
+
+function hideMemberSuggestions() {
+  elements.memberSuggestions?.classList.add('hidden');
+}
+
+function selectNextSuggestion() {
+  const items = elements.memberSuggestions?.querySelectorAll('.suggestion-item');
+  if (!items || items.length === 0) return;
+
+  const active = elements.memberSuggestions.querySelector('.suggestion-item.active');
+  if (active) {
+    active.classList.remove('active');
+    const next = active.nextElementSibling || items[0];
+    next.classList.add('active');
+    elements.memberInput.value = next.dataset.shape;
+  }
+}
+
+function selectPrevSuggestion() {
+  const items = elements.memberSuggestions?.querySelectorAll('.suggestion-item');
+  if (!items || items.length === 0) return;
+
+  const active = elements.memberSuggestions.querySelector('.suggestion-item.active');
+  if (active) {
+    active.classList.remove('active');
+    const prev = active.previousElementSibling || items[items.length - 1];
+    prev.classList.add('active');
+    elements.memberInput.value = prev.dataset.shape;
+  }
+}
+
+function addTakeoffItem() {
+  if (typeof TakeoffManager === 'undefined') {
+    showToast('Takeoff system not loaded', 'error');
+    return;
+  }
+
+  const member = elements.memberInput?.value.trim().toUpperCase();
+  const length = elements.lengthInput?.value.trim();
+  const qty = parseInt(elements.qtyInput?.value) || 1;
+  const mark = elements.markInput?.value.trim();
+
+  if (!member) {
+    showToast('Please enter a steel member', 'warning');
+    elements.memberInput?.focus();
+    return;
+  }
+
+  if (!length) {
+    showToast('Please enter a length', 'warning');
+    elements.lengthInput?.focus();
+    return;
+  }
+
+  // Validate member with steel database
+  if (typeof SteelDatabase !== 'undefined') {
+    const parsed = SteelDatabase.parseMember(member);
+    if (!parsed.valid) {
+      showToast(`Unknown member: ${member}. Adding anyway.`, 'warning');
+    }
+  }
+
+  const result = TakeoffManager.addItem({
+    member,
+    length,
+    quantity: qty,
+    mark: mark || undefined,
+    page: ViewerState.currentPage
+  });
+
+  if (result.success) {
+    // Clear inputs
+    elements.memberInput.value = '';
+    elements.lengthInput.value = '';
+    elements.qtyInput.value = '1';
+    elements.markInput.value = '';
+    elements.memberInput.focus();
+
+    updateTakeoffUI();
+    showToast(`Added: ${member} x${qty}`, 'success');
+  } else {
+    showToast(result.error || 'Failed to add item', 'error');
+  }
+}
+
+function updateTakeoffUI() {
+  if (typeof TakeoffManager === 'undefined') return;
+
+  const items = TakeoffManager.getItems();
+  const summary = TakeoffManager.getSummary();
+
+  // Update items list
+  if (items.length === 0) {
+    elements.emptyTakeoff?.classList.remove('hidden');
+    elements.takeoffItems.innerHTML = '';
+    elements.takeoffItems?.appendChild(elements.emptyTakeoff);
+  } else {
+    elements.emptyTakeoff?.classList.add('hidden');
+    elements.takeoffItems.innerHTML = items.map(item => `
+      <div class="takeoff-item" data-id="${item.id}">
+        <div class="member">
+          ${item.member}
+          ${item.mark ? `<span class="mark">${item.mark}</span>` : ''}
+        </div>
+        <div class="length">${item.lengthDisplay || item.length}</div>
+        <div class="qty">${item.quantity}</div>
+        <div class="weight">${formatNumber(item.totalWeight)} lbs</div>
+        <button class="delete-btn" data-id="${item.id}" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+    `).join('');
+
+    // Add delete handlers
+    elements.takeoffItems?.querySelectorAll('.delete-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const id = e.currentTarget.dataset.id;
+        TakeoffManager.removeItem(id);
+        updateTakeoffUI();
+        showToast('Item removed', 'success');
+      });
+    });
+  }
+
+  // Update totals
+  elements.totalItems.textContent = summary.totalItems;
+  elements.totalLength.textContent = `${formatNumber(summary.totalLengthFeet)} ft`;
+  elements.totalWeight.textContent = `${formatNumber(summary.totalWeight)} lbs`;
+  elements.totalTons.textContent = `${summary.totalTons.toFixed(2)} tons`;
+}
+
+function exportTakeoffCSV() {
+  if (typeof TakeoffManager === 'undefined') {
+    showToast('Takeoff system not loaded', 'error');
+    return;
+  }
+
+  const items = TakeoffManager.getItems();
+  if (items.length === 0) {
+    showToast('No items to export', 'warning');
+    return;
+  }
+
+  const csv = TakeoffManager.exportToCSV();
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+
+  const filename = ViewerState.filename.replace(/\.pdf$/i, '') + '_takeoff.csv';
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+
+  URL.revokeObjectURL(url);
+  showToast(`Exported: ${filename}`, 'success');
+}
+
+function formatNumber(num) {
+  if (num === undefined || num === null) return '0';
+  return Math.round(num).toLocaleString();
+}
+
+// ===== AUTO-DETECT FUNCTIONS =====
+let detectedMembersCache = [];
+
+async function startAutoDetect() {
+  // Check for API key
+  const { googleVisionApiKey } = await chrome.storage.sync.get('googleVisionApiKey');
+
+  if (!googleVisionApiKey) {
+    showApiKeyModal();
+    return;
+  }
+
+  // Show modal with loading state
+  elements.detectModal?.classList.remove('hidden');
+  elements.detectLoading?.classList.remove('hidden');
+  elements.detectResults?.classList.add('hidden');
+  elements.detectEmpty?.classList.add('hidden');
+
+  try {
+    if (typeof MemberDetector === 'undefined') {
+      throw new Error('Member detector not loaded');
+    }
+
+    // Run detection on current page
+    const result = await MemberDetector.detectMembers(
+      ViewerState.pdfDoc,
+      ViewerState.currentPage,
+      googleVisionApiKey,
+      2.5  // High resolution for better OCR
+    );
+
+    detectedMembersCache = result.members;
+
+    // Show results
+    displayDetectedMembers(result.members);
+
+  } catch (error) {
+    console.error('Auto-detect error:', error);
+    showToast(`Detection failed: ${error.message}`, 'error');
+    closeDetectModal();
+  }
+}
+
+function displayDetectedMembers(members) {
+  elements.detectLoading?.classList.add('hidden');
+  elements.detectResults?.classList.remove('hidden');
+
+  if (members.length === 0) {
+    elements.detectEmpty?.classList.remove('hidden');
+    elements.detectedList.innerHTML = '';
+    elements.detectCount.textContent = '0 members found';
+    elements.addSelectedBtn.disabled = true;
+    return;
+  }
+
+  elements.detectEmpty?.classList.add('hidden');
+  elements.detectCount.textContent = `${members.length} member${members.length === 1 ? '' : 's'} found`;
+
+  // Render detected members
+  elements.detectedList.innerHTML = members.map((member, index) => `
+    <div class="detected-item${member.isValid ? '' : ' invalid'}" data-index="${index}">
+      <input type="checkbox" id="member-${index}" ${member.isValid ? 'checked' : ''}>
+      <div class="member-info">
+        <span class="member-name">${member.normalized}</span>
+        <span class="member-details">
+          ${member.type}${member.isValid ? '' : ' (not in database)'}
+        </span>
+      </div>
+      ${member.weight ? `<span class="member-weight">${member.weight} lbs/ft</span>` : ''}
+      ${member.context ? `<span class="member-context" title="${member.context}">${member.context}</span>` : ''}
+    </div>
+  `).join('');
+
+  // Add click handlers for items
+  elements.detectedList.querySelectorAll('.detected-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      if (e.target.type !== 'checkbox') {
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        checkbox.checked = !checkbox.checked;
+      }
+      item.classList.toggle('selected', item.querySelector('input').checked);
+      updateAddSelectedButton();
+
+      // Highlight on canvas if position available
+      const index = parseInt(item.dataset.index);
+      highlightMemberOnCanvas(detectedMembersCache[index]);
+    });
+  });
+
+  // Initial selection state
+  elements.detectedList.querySelectorAll('.detected-item').forEach(item => {
+    const checkbox = item.querySelector('input[type="checkbox"]');
+    item.classList.toggle('selected', checkbox.checked);
+  });
+
+  updateAddSelectedButton();
+}
+
+function updateAddSelectedButton() {
+  const selectedCount = elements.detectedList?.querySelectorAll('input[type="checkbox"]:checked').length || 0;
+  elements.addSelectedBtn.disabled = selectedCount === 0;
+  elements.addSelectedBtn.innerHTML = `
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <line x1="12" y1="5" x2="12" y2="19"></line>
+      <line x1="5" y1="12" x2="19" y2="12"></line>
+    </svg>
+    Add Selected (${selectedCount})
+  `;
+}
+
+function toggleSelectAll() {
+  const checkboxes = elements.detectedList?.querySelectorAll('input[type="checkbox"]');
+  if (!checkboxes) return;
+
+  const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+  const newState = !allChecked;
+
+  checkboxes.forEach(cb => {
+    cb.checked = newState;
+    cb.closest('.detected-item')?.classList.toggle('selected', newState);
+  });
+
+  elements.selectAllBtn.textContent = newState ? 'Deselect All' : 'Select All';
+  updateAddSelectedButton();
+}
+
+function addSelectedMembers() {
+  if (typeof TakeoffManager === 'undefined') {
+    showToast('Takeoff system not loaded', 'error');
+    return;
+  }
+
+  const selectedIndices = [];
+  elements.detectedList?.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+    const item = cb.closest('.detected-item');
+    if (item) {
+      selectedIndices.push(parseInt(item.dataset.index));
+    }
+  });
+
+  let addedCount = 0;
+  selectedIndices.forEach(index => {
+    const member = detectedMembersCache[index];
+    if (member) {
+      const result = TakeoffManager.addItem({
+        member: member.normalized,
+        length: '',  // User will need to enter length
+        quantity: 1,
+        page: ViewerState.currentPage
+      });
+      if (result.success) {
+        addedCount++;
+      }
+    }
+  });
+
+  if (addedCount > 0) {
+    updateTakeoffUI();
+    showToast(`Added ${addedCount} member${addedCount === 1 ? '' : 's'} to takeoff`, 'success');
+
+    // Open takeoff panel if not already open
+    elements.takeoffPanel?.classList.remove('hidden');
+  }
+
+  closeDetectModal();
+}
+
+function closeDetectModal() {
+  elements.detectModal?.classList.add('hidden');
+  clearHighlights();
+}
+
+function highlightMemberOnCanvas(member) {
+  clearHighlights();
+
+  if (!member?.position) return;
+
+  const pos = member.position;
+  const container = elements.pdfContainer;
+  if (!container) return;
+
+  // Create highlight element
+  const highlight = document.createElement('div');
+  highlight.className = 'member-highlight';
+  highlight.style.left = `${pos.x * ViewerState.zoom}px`;
+  highlight.style.top = `${pos.y * ViewerState.zoom}px`;
+  highlight.style.width = `${Math.max(pos.width * ViewerState.zoom, 50)}px`;
+  highlight.style.height = `${Math.max(pos.height * ViewerState.zoom, 20)}px`;
+
+  container.appendChild(highlight);
+
+  // Auto-remove after 3 seconds
+  setTimeout(() => highlight.remove(), 3000);
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.member-highlight').forEach(el => el.remove());
+}

@@ -771,6 +771,454 @@ body {
 }
 
 /* ============================================
+   STEEL TAKEOFF PANEL
+   ============================================ */
+.takeoff-panel {
+  width: 320px;
+  background: var(--bg-dark);
+  border-left: 1px solid rgba(0, 255, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.takeoff-panel.hidden {
+  display: none;
+}
+
+/* Takeoff Form */
+.takeoff-form {
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 255, 0, 0.1);
+  margin-bottom: 12px;
+}
+
+.input-row {
+  margin-bottom: 10px;
+  position: relative;
+}
+
+.input-row label {
+  display: block;
+  font-size: 10px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-family: var(--font-terminal);
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.input-row input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 255, 0, 0.2);
+  border-radius: 4px;
+  background: var(--bg-deepest);
+  color: var(--text-primary);
+  font-family: var(--font-terminal);
+  font-size: 12px;
+}
+
+.input-row input:focus {
+  outline: none;
+  border-color: var(--matrix-green);
+  box-shadow: 0 0 8px rgba(0, 255, 0, 0.2);
+}
+
+.input-row input::placeholder {
+  color: var(--text-dim);
+}
+
+.input-row-group {
+  display: flex;
+  gap: 10px;
+}
+
+.input-row.half {
+  flex: 1;
+}
+
+/* Member Suggestions Dropdown */
+.suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(0, 255, 0, 0.3);
+  border-radius: 4px;
+  max-height: 150px;
+  overflow-y: auto;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.suggestions.hidden {
+  display: none;
+}
+
+.suggestion-item {
+  padding: 8px 10px;
+  font-family: var(--font-terminal);
+  font-size: 11px;
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(0, 255, 0, 0.05);
+}
+
+.suggestion-item:hover,
+.suggestion-item.active {
+  background: rgba(0, 255, 0, 0.1);
+  color: var(--matrix-green);
+}
+
+.suggestion-item .weight {
+  color: var(--text-dim);
+  font-size: 10px;
+}
+
+/* Button Full Width */
+.btn-primary.full-width,
+.btn-secondary.full-width {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Takeoff List */
+.takeoff-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 12px;
+}
+
+.list-header {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.5fr 1fr 24px;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 255, 0, 0.2);
+  font-size: 9px;
+  color: var(--matrix-green);
+  font-family: var(--font-terminal);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.list-items {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.takeoff-item {
+  display: grid;
+  grid-template-columns: 2fr 1fr 0.5fr 1fr 24px;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(0, 255, 0, 0.05);
+  font-size: 11px;
+  align-items: center;
+}
+
+.takeoff-item:hover {
+  background: rgba(0, 255, 0, 0.03);
+}
+
+.takeoff-item .member {
+  color: var(--matrix-green);
+  font-family: var(--font-terminal);
+  font-weight: 500;
+}
+
+.takeoff-item .mark {
+  font-size: 9px;
+  color: var(--text-dim);
+  display: block;
+}
+
+.takeoff-item .length,
+.takeoff-item .qty,
+.takeoff-item .weight {
+  color: var(--text-secondary);
+  font-family: var(--font-terminal);
+}
+
+.takeoff-item .delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.takeoff-item .delete-btn:hover {
+  color: #ff0040;
+  background: rgba(255, 0, 64, 0.1);
+}
+
+/* Empty State */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  color: var(--text-dim);
+  text-align: center;
+  gap: 8px;
+}
+
+.empty-state svg {
+  opacity: 0.3;
+}
+
+.empty-state span {
+  font-size: 12px;
+}
+
+.empty-state .hint {
+  font-size: 10px;
+  opacity: 0.6;
+}
+
+/* Takeoff Summary */
+.takeoff-summary {
+  background: var(--bg-elevated);
+  border-radius: 6px;
+  padding: 12px;
+  margin-bottom: 12px;
+  border: 1px solid rgba(0, 255, 0, 0.1);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 11px;
+}
+
+.summary-row .label {
+  color: var(--text-secondary);
+  font-family: var(--font-terminal);
+}
+
+.summary-row .value {
+  color: var(--text-primary);
+  font-family: var(--font-terminal);
+  font-weight: 500;
+}
+
+.summary-row.highlight {
+  border-top: 1px solid rgba(0, 255, 0, 0.1);
+  margin-top: 6px;
+  padding-top: 10px;
+}
+
+.summary-row.highlight .label {
+  color: var(--matrix-green);
+}
+
+.summary-row.highlight .value {
+  color: var(--matrix-green);
+  font-size: 13px;
+  text-shadow: 0 0 10px rgba(0, 255, 0, 0.3);
+}
+
+/* Takeoff Actions */
+.takeoff-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.takeoff-actions .btn-primary,
+.takeoff-actions .btn-secondary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-family: var(--font-terminal);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+/* ============================================
+   AUTO-DETECT MODAL
+   ============================================ */
+.detect-modal-content {
+  width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.detect-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  gap: 16px;
+  color: var(--matrix-green);
+  font-family: var(--font-terminal);
+}
+
+.detect-results {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.detect-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(0, 255, 0, 0.1);
+}
+
+.detect-info span {
+  font-size: 12px;
+  color: var(--matrix-green);
+  font-family: var(--font-terminal);
+}
+
+.btn-link {
+  background: none;
+  border: none;
+  color: var(--matrix-green);
+  font-size: 11px;
+  cursor: pointer;
+  text-decoration: underline;
+  font-family: var(--font-terminal);
+}
+
+.btn-link:hover {
+  color: var(--matrix-green-dim);
+}
+
+.detected-list {
+  max-height: 300px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detected-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid rgba(0, 255, 0, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.detected-item:hover {
+  border-color: rgba(0, 255, 0, 0.3);
+  background: rgba(0, 255, 0, 0.05);
+}
+
+.detected-item.selected {
+  border-color: var(--matrix-green);
+  background: rgba(0, 255, 0, 0.1);
+  box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
+}
+
+.detected-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--matrix-green);
+  cursor: pointer;
+}
+
+.detected-item .member-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.detected-item .member-name {
+  font-family: var(--font-terminal);
+  font-size: 13px;
+  color: var(--matrix-green);
+  font-weight: 600;
+}
+
+.detected-item .member-details {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.detected-item .member-weight {
+  font-family: var(--font-terminal);
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: right;
+}
+
+.detected-item .member-context {
+  font-size: 9px;
+  color: var(--text-dim);
+  font-style: italic;
+  max-width: 150px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.detect-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: var(--text-dim);
+  text-align: center;
+  gap: 12px;
+}
+
+.detect-empty svg {
+  opacity: 0.3;
+}
+
+.detect-empty span {
+  font-size: 13px;
+}
+
+.detect-empty .hint {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+/* Highlighted annotation on canvas */
+.member-highlight {
+  position: absolute;
+  border: 2px solid var(--matrix-green);
+  background: rgba(0, 255, 0, 0.1);
+  pointer-events: none;
+  animation: highlightPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes highlightPulse {
+  0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 0, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(0, 255, 0, 0.6); }
+}
+
+/* ============================================
    UTILITIES
    ============================================ */
 .hidden {

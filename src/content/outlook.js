@@ -126,6 +126,18 @@ async function extractBidInfo() {
 
   const emailText = emailBody.innerText || '';
 
+  // Read all message bodies in thread (Outlook uses multiple body containers)
+  const allMessageBodies = emailContainer.querySelectorAll(
+    '[aria-label*="Message body"], [id*="UniqueMessageBody"], .allowTextSelection'
+  );
+  const threadTexts = [];
+  allMessageBodies.forEach(msgBody => {
+    const msgText = msgBody.innerText?.trim();
+    if (msgText && msgText.length > 10) {
+      threadTexts.push(msgText);
+    }
+  });
+
   // Get subject using SafeQuery or fallback
   let subjectEl = window.SafeQuery
     ? SafeQuery.query(subjectSelectors, document, { name: 'outlook-subject', silent: true })
@@ -151,21 +163,42 @@ async function extractBidInfo() {
   const senderName = senderEl?.innerText?.split('\n')[0] || '';
   const senderEmail = extractEmailFromText(senderEl?.innerText || '') || '';
 
-  // Extract bid information
+  // Use EmailParser for deep extraction (loaded before outlook.js via manifest)
+  const parsed = (typeof EmailParser !== 'undefined')
+    ? EmailParser.parseFullEmail(emailText)
+    : { signature: {}, sections: {}, thread: [], metadata: {} };
+
   const bidInfo = {
-    project: extractProjectName(subject, emailText),
-    gc: extractGCName(senderName, emailText),
+    project: parsed.sections.project || extractProjectName(subject, emailText),
+    gc: parsed.signature.company || extractGCName(senderName, emailText),
     bidDate: extractBidDate(emailText),
-    location: extractLocation(emailText),
-    scope: extractScope(emailText),
+    location: parsed.sections.location || extractLocation(emailText),
+    scope: parsed.sections.scope || extractScope(emailText),
     contact: senderName,
     email: senderEmail,
-    phone: extractPhone(emailText),
+    phone: parsed.signature.phone || extractPhone(emailText),
+
+    projectManager: parsed.metadata.projectManager || parsed.signature.name || '',
+    gcCompany: parsed.signature.company || extractGCName(senderName, emailText),
+    gcEmail: parsed.signature.email || senderEmail,
+    gcPhone: parsed.signature.phone || extractPhone(emailText),
+    bidTime: parsed.metadata.bidTime || '',
+    submissionInstructions: parsed.sections.submissionInstructions || '',
+    preBidMeeting: parsed.metadata.preBidMeeting || { date: '', location: '', mandatory: false },
+    addenda: parsed.metadata.addenda || [],
+    bondRequirements: parsed.sections.bondRequirements || parsed.metadata.bondRequirements || '',
+    generalNotes: parsed.sections.generalNotes || emailText,
+    threadMessages: parsed.thread.length > 1
+      ? parsed.thread
+      : (threadTexts.length > 1
+        ? threadTexts.map(t => ({ sender: '', date: '', body: t }))
+        : []),
+
     attachments: await extractAttachments(),
     downloadLinks: extractDownloadLinks(emailBody),
     notes: '',
     rawSubject: subject,
-    rawText: emailText.substring(0, 2000)
+    rawText: emailText,
   };
 
   return bidInfo;

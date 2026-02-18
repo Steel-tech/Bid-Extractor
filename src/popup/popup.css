@@ -1,5 +1,5 @@
 /* ============================================
-   BID EXTRACTOR v1.3.0 - MATRIX CYBERPUNK THEME
+   BID EXTRACTOR v1.5.0 - MATRIX CYBERPUNK THEME
    ============================================ */
 
 /* CSS Variables - Matrix Color System */
@@ -1360,4 +1360,83 @@ body::before {
   0%, 100% { transform: translateX(0); }
   20%, 60% { transform: translateX(-5px); }
   40%, 80% { transform: translateX(5px); }
+}
+
+/* ============================================
+   NOTES PREVIEW
+   ============================================ */
+.preview-row-notes {
+  flex-direction: column;
+}
+
+.preview-row-notes .label {
+  margin-bottom: 4px;
+}
+
+.notes-preview {
+  max-height: 60px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.notes-preview::after {
+  content: '... click to expand';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: linear-gradient(90deg, transparent, var(--bg-dark) 40%);
+  padding-left: 20px;
+  color: var(--matrix-green);
+  font-family: var(--font-terminal);
+  font-size: 10px;
+}
+
+.notes-expanded {
+  background: var(--bg-deepest);
+  border: 1px solid rgba(0, 255, 0, 0.1);
+  border-radius: 6px;
+  padding: 12px;
+  margin-top: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.notes-expanded pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  font-family: var(--font-terminal);
+  font-size: 11px;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ============================================
+   COPY DROPDOWN
+   ============================================ */
+.copy-section {
+  position: relative;
+  flex: 1;
+}
+
+.copy-dropdown {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--bg-dark);
+  border: 1px solid rgba(0, 255, 0, 0.2);
+  border-radius: 8px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.5), 0 0 20px rgba(0, 255, 0, 0.1);
+  margin-bottom: 4px;
+  overflow: hidden;
+  z-index: 10;
+}
+
+.copy-dropdown.hidden {
+  display: none;
 }

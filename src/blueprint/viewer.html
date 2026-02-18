@@ -117,6 +117,16 @@
             <rect x="6" y="14" width="12" height="8"></rect>
           </svg>
         </button>
+
+        <!-- Steel Takeoff Toggle -->
+        <button id="takeoff-toggle" class="btn-action" title="Steel Takeoff Tool">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M2 20h20"></path>
+            <path d="M5 20V8l7-5 7 5v12"></path>
+            <rect x="9" y="12" width="6" height="8"></rect>
+          </svg>
+          <span>Takeoff</span>
+        </button>
       </div>
     </header>
 
@@ -211,6 +221,120 @@
         </div>
       </div>
 
+      <!-- Steel Takeoff Panel -->
+      <aside class="takeoff-panel hidden" id="takeoff-panel">
+        <div class="panel-header">
+          <span>Steel Takeoff</span>
+          <button id="close-takeoff" class="btn-tool">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+        <div class="panel-content">
+          <!-- Input Form -->
+          <div class="takeoff-form">
+            <div class="input-row">
+              <label for="member-input">Member</label>
+              <input type="text" id="member-input" placeholder="W12X26, HSS6X4X1/4..." autocomplete="off">
+              <div id="member-suggestions" class="suggestions hidden"></div>
+            </div>
+            <div class="input-row-group">
+              <div class="input-row half">
+                <label for="length-input">Length</label>
+                <input type="text" id="length-input" placeholder="10'-6&quot;">
+              </div>
+              <div class="input-row half">
+                <label for="qty-input">Qty</label>
+                <input type="number" id="qty-input" value="1" min="1">
+              </div>
+            </div>
+            <div class="input-row">
+              <label for="mark-input">Mark/Tag (optional)</label>
+              <input type="text" id="mark-input" placeholder="B1, C2, G3...">
+            </div>
+            <button id="add-item-btn" class="btn-primary full-width">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+              Add Item
+            </button>
+            <button id="auto-detect-btn" class="btn-action full-width" style="margin-top: 8px;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="M21 21l-4.35-4.35"></path>
+                <path d="M11 8v6"></path>
+                <path d="M8 11h6"></path>
+              </svg>
+              Auto-Detect Members
+            </button>
+          </div>
+
+          <!-- Takeoff Items List -->
+          <div class="takeoff-list">
+            <div class="list-header">
+              <span class="col-member">Member</span>
+              <span class="col-length">Length</span>
+              <span class="col-qty">Qty</span>
+              <span class="col-weight">Weight</span>
+              <span class="col-actions"></span>
+            </div>
+            <div id="takeoff-items" class="list-items">
+              <!-- Items will be inserted here -->
+              <div class="empty-state" id="empty-takeoff">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                  <path d="M2 20h20"></path>
+                  <path d="M5 20V8l7-5 7 5v12"></path>
+                </svg>
+                <span>No items yet</span>
+                <span class="hint">Add steel members above</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Totals Summary -->
+          <div class="takeoff-summary" id="takeoff-summary">
+            <div class="summary-row">
+              <span class="label">Total Items:</span>
+              <span class="value" id="total-items">0</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Total Length:</span>
+              <span class="value" id="total-length">0 ft</span>
+            </div>
+            <div class="summary-row highlight">
+              <span class="label">Total Weight:</span>
+              <span class="value" id="total-weight">0 lbs</span>
+            </div>
+            <div class="summary-row highlight">
+              <span class="label">Tonnage:</span>
+              <span class="value" id="total-tons">0.00 tons</span>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="takeoff-actions">
+            <button id="export-csv" class="btn-primary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Export CSV
+            </button>
+            <button id="clear-takeoff" class="btn-secondary">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+              </svg>
+              Clear All
+            </button>
+          </div>
+        </div>
+      </aside>
+
       <!-- Extracted Data Panel -->
       <aside class="data-panel hidden" id="data-panel">
         <div class="panel-header">
@@ -295,6 +419,49 @@
   <!-- Toast Container -->
   <div id="toast-container" class="toast-container"></div>
 
+  <!-- Auto-Detect Modal -->
+  <div class="modal hidden" id="detect-modal">
+    <div class="modal-content detect-modal-content">
+      <div class="modal-header">
+        <h3>Detected Steel Members</h3>
+        <button id="close-detect-modal" class="btn-icon">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="detect-loading" class="detect-loading">
+          <div class="spinner-lg"></div>
+          <span>Scanning page for steel members...</span>
+        </div>
+        <div id="detect-results" class="detect-results hidden">
+          <div class="detect-info">
+            <span id="detect-count">0 members found</span>
+            <button id="select-all-btn" class="btn-link">Select All</button>
+          </div>
+          <div id="detected-list" class="detected-list">
+            <!-- Detected items will be inserted here -->
+          </div>
+          <div class="detect-empty hidden" id="detect-empty">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="M21 21l-4.35-4.35"></path>
+            </svg>
+            <span>No steel members detected on this page</span>
+            <span class="hint">Try zooming in or checking a different page</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button id="cancel-detect" class="btn-secondary">Cancel</button>
+        <button id="add-selected-btn" class="btn-primary" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="12" y1="5" x2="12" y2="19"></line>
+            <line x1="5" y1="12" x2="19" y2="12"></line>
+          </svg>
+          Add Selected (0)
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- API Key Modal -->
   <div class="modal hidden" id="api-key-modal">
     <div class="modal-content">
@@ -323,6 +490,9 @@
 
   <!-- Scripts -->
   <script src="../lib/pdf.min.js"></script>
+  <script src="steel-database.js"></script>
+  <script src="takeoff.js"></script>
+  <script src="member-detector.js"></script>
   <script src="ocr-service.js"></script>
   <script src="annotations.js"></script>
   <script src="viewer.js"></script>

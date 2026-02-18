@@ -1,6 +1,6 @@
 {
   "name": "bid-extractor",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Matrix-themed bid extraction Chrome extension with priority scoring",
   "private": true,
   "scripts": {
