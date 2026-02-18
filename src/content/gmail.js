@@ -119,6 +119,16 @@ async function extractBidInfo() {
   const emailText = emailBody.innerText || '';
   const emailHtml = emailBody.innerHTML || '';
 
+  // Read ALL messages in the thread (Gmail puts each in a separate .a3s container)
+  const allMessageBodies = document.querySelectorAll('.a3s.aiL, .a3s');
+  const threadTexts = [];
+  allMessageBodies.forEach(msgBody => {
+    const msgText = msgBody.innerText?.trim();
+    if (msgText && msgText.length > 10) {
+      threadTexts.push(msgText);
+    }
+  });
+
   // Get email subject using config selectors
   const subjectSelectors = SELECTORS?.subject || ['h2[data-thread-perm-id]', '[data-thread-perm-id] span', '.hP'];
   let subjectEl = null;
@@ -138,21 +148,45 @@ async function extractBidInfo() {
   const senderEmail = senderEl?.getAttribute('email') || '';
   const senderName = senderEl?.getAttribute('name') || senderEl?.innerText || '';
 
-  // Extract bid information
+  // Use EmailParser for deep extraction (loaded before gmail.js via manifest)
+  const parsed = (typeof EmailParser !== 'undefined')
+    ? EmailParser.parseFullEmail(emailText)
+    : { signature: {}, sections: {}, thread: [], metadata: {} };
+
   const bidInfo = {
-    project: extractProjectName(subject, emailText),
-    gc: extractGCName(senderName, emailText),
+    // Core fields — parser results with regex fallbacks
+    project: parsed.sections.project || extractProjectName(subject, emailText),
+    gc: parsed.signature.company || extractGCName(senderName, emailText),
     bidDate: extractBidDate(emailText),
-    location: extractLocation(emailText),
-    scope: extractScope(emailText),
+    location: parsed.sections.location || extractLocation(emailText),
+    scope: parsed.sections.scope || extractScope(emailText),
     contact: senderName,
     email: senderEmail,
-    phone: extractPhone(emailText),
+    phone: parsed.signature.phone || extractPhone(emailText),
+
+    // New fields from parser
+    projectManager: parsed.metadata.projectManager || parsed.signature.name || '',
+    gcCompany: parsed.signature.company || extractGCName(senderName, emailText),
+    gcEmail: parsed.signature.email || senderEmail,
+    gcPhone: parsed.signature.phone || extractPhone(emailText),
+    bidTime: parsed.metadata.bidTime || '',
+    submissionInstructions: parsed.sections.submissionInstructions || '',
+    preBidMeeting: parsed.metadata.preBidMeeting || { date: '', location: '', mandatory: false },
+    addenda: parsed.metadata.addenda || [],
+    bondRequirements: parsed.sections.bondRequirements || parsed.metadata.bondRequirements || '',
+    generalNotes: parsed.sections.generalNotes || emailText,
+    threadMessages: parsed.thread.length > 1
+      ? parsed.thread
+      : (threadTexts.length > 1
+        ? threadTexts.map(t => ({ sender: '', date: '', body: t }))
+        : []),
+
+    // Existing fields
     attachments: await extractAttachments(),
     downloadLinks: extractDownloadLinks(emailBody),
     notes: '',
     rawSubject: subject,
-    rawText: emailText.substring(0, 2000) // Store first 2000 chars for reference
+    rawText: emailText,
   };
 
   return bidInfo;

@@ -56,7 +56,7 @@
           </svg>
           extract from email
         </button>
-        <p class="hint">// open rfq email, then click to extract</p>
+        <p class="hint" id="extract-hint">// open rfq email or bid portal</p>
       </div>
 
       <!-- Extracted Data Preview -->
@@ -72,8 +72,16 @@
             <span id="preview-gc" class="value">-</span>
           </div>
           <div class="preview-row">
+            <span class="label">pm:</span>
+            <span id="preview-pm" class="value">-</span>
+          </div>
+          <div class="preview-row">
             <span class="label">bid_date:</span>
             <span id="preview-date" class="value highlight">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">bid_time:</span>
+            <span id="preview-time" class="value highlight">-</span>
           </div>
           <div class="preview-row">
             <span class="label">location:</span>
@@ -86,6 +94,17 @@
           <div class="preview-row">
             <span class="label">files:</span>
             <span id="preview-attachments" class="value">-</span>
+          </div>
+          <div class="preview-row">
+            <span class="label">thread:</span>
+            <span id="preview-thread" class="value">-</span>
+          </div>
+          <div class="preview-row preview-row-notes">
+            <span class="label">notes:</span>
+            <span id="preview-notes" class="value notes-preview">-</span>
+          </div>
+          <div id="notes-expanded" class="notes-expanded hidden">
+            <pre id="notes-full-text"></pre>
           </div>
         </div>
 
@@ -111,13 +130,20 @@
             </svg>
             download all
           </button>
-          <button id="copy-btn" class="btn btn-secondary">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            copy
-          </button>
+          <div class="copy-section">
+            <button id="copy-btn" class="btn btn-secondary">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+              </svg>
+              copy
+            </button>
+            <div id="copy-dropdown" class="copy-dropdown hidden">
+              <button id="copy-all-btn" class="dropdown-item">copy all info</button>
+              <button id="copy-spreadsheet-btn" class="dropdown-item">copy for spreadsheet</button>
+              <button id="copy-notes-btn" class="dropdown-item">copy notes only</button>
+            </div>
+          </div>
         </div>
 
         <!-- Calendar Options -->
@@ -163,7 +189,7 @@
         </svg>
       </button>
       <a href="https://structupath.ai" target="_blank" class="creator-credit" title="Created by Victor @ StructuPath.ai">structupath.ai</a>
-      <span class="version">v1.3.0</span>
+      <span class="version">v1.5.0</span>
     </footer>
   </div>
 

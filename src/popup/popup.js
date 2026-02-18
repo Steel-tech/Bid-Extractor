@@ -1,6 +1,6 @@
 // @ts-nocheck
 // Popup Script for Bid Extractor
-// v1.3.1 - MATRIX EDITION (Config-based)
+// v1.5.0 - MATRIX EDITION (Config-based + Email Parser)
 // TODO: Enable type checking after incremental migration
 
 // ===== CONFIG LOADING =====
@@ -457,17 +457,36 @@ document.addEventListener('DOMContentLoaded', async () => {
   checkCurrentTab();
 });
 
-// Check if we're on a supported email page
+// Platform detection - maps URL patterns to site type and message action
+const PLATFORM_SITES = [
+  { pattern: 'mail.google.com', type: 'email', name: 'Gmail', action: 'extract' },
+  { pattern: 'outlook.live.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'outlook.office.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'outlook.office365.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'buildingconnected.com', type: 'platform', name: 'BuildingConnected', action: 'extractDocuments' },
+  { pattern: 'planhub.com', type: 'platform', name: 'PlanHub', action: 'extractDocuments' },
+  { pattern: 'procore.com', type: 'platform', name: 'Procore', action: 'extractDocuments' },
+  { pattern: 'smartbidnet.com', type: 'platform', name: 'SmartBid', action: 'extractDocuments' },
+  { pattern: 'pipelinesuite.com', type: 'platform', name: 'PipelineSuite', action: 'extractDocuments' },
+];
+
+let currentSite = null;
+
+// Check if we're on a supported site
 async function checkCurrentTab() {
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const url = tab?.url || '';
 
-    if (url.includes('mail.google.com') || url.includes('outlook')) {
-      setStatus('ready', 'Ready');
+    currentSite = PLATFORM_SITES.find(s => url.includes(s.pattern)) || null;
+
+    if (currentSite) {
+      setStatus('ready', currentSite.name);
       extractBtn.disabled = false;
+      const btnLabel = currentSite.type === 'email' ? 'extract from email' : 'scan documents';
+      extractBtn.querySelector('svg').nextSibling.textContent = ` ${btnLabel}`;
     } else {
-      setStatus('error', 'Open Gmail or Outlook');
+      setStatus('error', 'Open a supported site');
       extractBtn.disabled = true;
     }
   } catch (error) {
@@ -485,13 +504,13 @@ function setStatus(type, text) {
 
 // Extract button click
 extractBtn.addEventListener('click', async () => {
+  if (!currentSite) return;
+
   setStatus('loading', 'Extracting...');
   setButtonLoading(extractBtn);
 
   try {
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    console.log('Current tab:', tab?.url);
-
     if (!tab?.id) {
       setStatus('error', 'Cannot access tab');
       clearButtonLoading(extractBtn);
@@ -499,60 +518,18 @@ extractBtn.addEventListener('click', async () => {
       return;
     }
 
-    // Send message to content script
-    const response = await chrome.tabs.sendMessage(tab.id, { action: 'extract' });
-    console.log('Response from content script:', response);
+    const response = await chrome.tabs.sendMessage(tab.id, { action: currentSite.action });
 
-    if (response?.success) {
-      currentExtraction = response.data;
-      displayExtraction(currentExtraction);
-      await saveExtraction(currentExtraction);
-
-      // AUTO-DOWNLOAD files immediately after extraction
-      try {
-        const settings = await chrome.storage.local.get(['folderPattern', 'createSummary']);
-        // Default: GC Name + Bid Date + Project (Company first, then date)
-        const folderPattern = settings.folderPattern || 'Bids/{gc}_{date}_{project}';
-        const folderName = createFolderName(folderPattern, currentExtraction);
-
-        // 1. Create the summary text file
-        const summaryContent = createSummaryText(currentExtraction);
-        const summaryBlob = new Blob([summaryContent], { type: 'text/plain' });
-        const summaryUrl = URL.createObjectURL(summaryBlob);
-        await downloadFile(summaryUrl, `${folderName}/bid_info.txt`);
-        URL.revokeObjectURL(summaryUrl);
-
-        // 2. Create the Project Info Sheet HTML (opens in Word, Google Docs, or browser)
-        const projectInfoHtml = createProjectInfoSheet(currentExtraction);
-        const htmlBlob = new Blob([projectInfoHtml], { type: 'text/html' });
-        const htmlUrl = URL.createObjectURL(htmlBlob);
-        await downloadFile(htmlUrl, `${folderName}/Project_Info_Sheet.html`);
-        URL.revokeObjectURL(htmlUrl);
-
-        console.log('Files saved to:', folderName);
-        setStatus('ready', 'Extracted & Saved!');
-        showToast(`Bid extracted: ${currentExtraction.project || 'Unknown'}`, 'success');
-        flashButtonSuccess(extractBtn);
-      } catch (downloadErr) {
-        console.error('Auto-download failed:', downloadErr);
-        setStatus('ready', 'Extracted! Click Download to save.');
-        showToast('Extracted! Auto-download failed.', 'warning');
-      }
+    if (currentSite.type === 'email') {
+      handleEmailResponse(response);
     } else {
-      setStatus('error', response?.error || 'Extraction failed');
-      showToast(response?.error || 'Extraction failed', 'error');
-      extractBtn.classList.add('shake');
-      setTimeout(() => extractBtn.classList.remove('shake'), 400);
+      handlePlatformResponse(response);
     }
   } catch (error) {
     console.error('Extraction error:', error);
-    // More helpful error messages
     if (error.message?.includes('Receiving end does not exist')) {
-      setStatus('error', 'Refresh Gmail page first');
-      showToast('Refresh the email page first', 'error');
-    } else if (error.message?.includes('Cannot access')) {
-      setStatus('error', 'Cannot access this page');
-      showToast('Cannot access this page', 'error');
+      setStatus('error', 'Refresh page first');
+      showToast('Refresh the page first', 'error');
     } else {
       setStatus('error', error.message || 'Try refreshing page');
       showToast(error.message || 'Try refreshing the page', 'error');
@@ -564,17 +541,196 @@ extractBtn.addEventListener('click', async () => {
   clearButtonLoading(extractBtn);
 });
 
+function handleEmailResponse(response) {
+  if (response?.success) {
+    currentExtraction = response.data;
+    displayExtraction(currentExtraction);
+    saveExtraction(currentExtraction);
+
+    (async () => {
+      try {
+        const settings = await chrome.storage.local.get(['folderPattern', 'createSummary']);
+        const folderPattern = settings.folderPattern || 'Bids/{gc}_{date}_{project}';
+        const folderName = createFolderName(folderPattern, currentExtraction);
+
+        const summaryContent = createSummaryText(currentExtraction);
+        const summaryBlob = new Blob([summaryContent], { type: 'text/plain' });
+        const summaryUrl = URL.createObjectURL(summaryBlob);
+        await downloadFile(summaryUrl, `${folderName}/bid_info.txt`);
+        URL.revokeObjectURL(summaryUrl);
+
+        const projectInfoHtml = createProjectInfoSheet(currentExtraction);
+        const htmlBlob = new Blob([projectInfoHtml], { type: 'text/html' });
+        const htmlUrl = URL.createObjectURL(htmlBlob);
+        await downloadFile(htmlUrl, `${folderName}/Project_Info_Sheet.html`);
+        URL.revokeObjectURL(htmlUrl);
+
+        setStatus('ready', 'Extracted & Saved!');
+        showToast(`Bid extracted: ${currentExtraction.project || 'Unknown'}`, 'success');
+        flashButtonSuccess(extractBtn);
+      } catch (downloadErr) {
+        console.error('Auto-download failed:', downloadErr);
+        setStatus('ready', 'Extracted!');
+        showToast('Extracted! Auto-download failed.', 'warning');
+      }
+    })();
+  } else {
+    setStatus('error', response?.error || 'Extraction failed');
+    showToast(response?.error || 'Extraction failed', 'error');
+    extractBtn.classList.add('shake');
+    setTimeout(() => extractBtn.classList.remove('shake'), 400);
+  }
+}
+
+function handlePlatformResponse(response) {
+  if (response?.success) {
+    const docs = response.documents || [];
+    const info = response.projectInfo || {};
+    const count = docs.length;
+
+    // Populate preview card with project info
+    if (info.projectName) {
+      const el = document.getElementById('preview-project');
+      if (el) el.textContent = info.projectName;
+    }
+    if (info.gc) {
+      const el = document.getElementById('preview-gc');
+      if (el) el.textContent = info.gc;
+    }
+    if (info.bidDate) {
+      const el = document.getElementById('preview-date');
+      if (el) el.textContent = info.bidDate;
+    }
+    if (info.bidTime) {
+      const el = document.getElementById('preview-time');
+      if (el) el.textContent = info.bidTime;
+    }
+    if (info.location) {
+      const el = document.getElementById('preview-location');
+      if (el) el.textContent = info.location;
+    }
+    if (info.scope) {
+      const el = document.getElementById('preview-scope');
+      if (el) el.textContent = info.scope;
+    }
+    if (info.notes) {
+      const el = document.getElementById('preview-notes');
+      if (el) {
+        const short = info.notes.length > 80 ? info.notes.substring(0, 80) + '...' : info.notes;
+        el.textContent = short;
+        el.title = info.notes;
+        el.style.cursor = 'pointer';
+        el.onclick = () => {
+          const expanded = document.getElementById('notes-expanded');
+          const fullText = document.getElementById('notes-full-text');
+          if (expanded && fullText) {
+            fullText.textContent = info.notes;
+            expanded.classList.toggle('hidden');
+          }
+        };
+      }
+    }
+    // PM field - use source platform name
+    const pmEl = document.getElementById('preview-pm');
+    if (pmEl) pmEl.textContent = info.source || currentSite.name;
+
+    // Show file count in attachments field
+    const attEl = document.getElementById('preview-attachments');
+    if (attEl) attEl.textContent = count > 0 ? `${count} file(s)` : 'none found';
+
+    // Thread field - show platform URL
+    const threadEl = document.getElementById('preview-thread');
+    if (threadEl) threadEl.textContent = info.source || currentSite.name;
+
+    const hasInfo = info.projectName || info.gc || info.bidDate || info.location;
+    const statusMsg = hasInfo
+      ? `${info.projectName || currentSite.name} - ${count} doc(s)`
+      : `${count} document(s) found`;
+    setStatus('ready', statusMsg);
+    showToast(`Found ${count} document(s) on ${currentSite.name}`, 'success');
+    flashButtonSuccess(extractBtn);
+
+    // Show document links
+    if (count > 0) {
+      displayDownloadLinks(docs.map(doc => ({
+        url: doc.url,
+        platform: currentSite.name,
+        icon: doc.type === 'CAD Drawing' ? '\uD83D\uDCD0' : '\uD83D\uDCC4',
+        text: doc.name,
+        type: 'file'
+      })));
+    }
+
+    previewSection.classList.remove('hidden');
+
+    // Store for copy/calendar/download functions
+    currentExtraction = {
+      project: info.projectName || '',
+      gc: info.gc || '',
+      bidDate: info.bidDate || '',
+      bidTime: info.bidTime || '',
+      location: info.location || '',
+      scope: info.scope || '',
+      notes: info.notes || '',
+      attachments: docs.map(d => d.name),
+      source: info.source || currentSite.name
+    };
+
+    downloadBtn.onclick = async () => {
+      setButtonLoading(downloadBtn);
+      try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const result = await chrome.tabs.sendMessage(tab.id, { action: 'downloadAllDocuments' });
+        setStatus('ready', `Downloaded ${result.downloaded || 0} file(s)`);
+        showToast(`Downloaded ${result.downloaded || 0} file(s)`, 'success');
+        flashButtonSuccess(downloadBtn);
+      } catch (err) {
+        showToast('Download failed: ' + err.message, 'error');
+      }
+      clearButtonLoading(downloadBtn);
+    };
+  } else {
+    setStatus('error', response?.error || 'No documents found');
+    showToast(response?.error || 'No documents found on this page', 'warning');
+  }
+}
+
 // Display extracted data
 function displayExtraction(data) {
   previewSection.classList.remove('hidden');
 
   document.getElementById('preview-project').textContent = data.project || '-';
-  document.getElementById('preview-gc').textContent = data.gc || '-';
+  document.getElementById('preview-gc').textContent = data.gcCompany || data.gc || '-';
+  document.getElementById('preview-pm').textContent = data.projectManager || data.contact || '-';
   document.getElementById('preview-date').textContent = data.bidDate || '-';
+  document.getElementById('preview-time').textContent = data.bidTime || '-';
   document.getElementById('preview-location').textContent = data.location || '-';
   document.getElementById('preview-scope').textContent = data.scope || '-';
   document.getElementById('preview-attachments').textContent =
     data.attachments?.length ? `${data.attachments.length} file(s)` : 'None';
+
+  // Thread messages count
+  const threadCount = data.threadMessages?.length || 0;
+  document.getElementById('preview-thread').textContent =
+    threadCount > 0 ? `${threadCount} message(s)` : '-';
+
+  // Notes / general notes preview
+  const notesText = data.generalNotes || data.notes || '';
+  const notesPreview = document.getElementById('preview-notes');
+  const notesExpanded = document.getElementById('notes-expanded');
+  const notesFullText = document.getElementById('notes-full-text');
+
+  if (notesText && notesText.length > 10) {
+    notesPreview.textContent = notesText.substring(0, 150);
+    notesFullText.textContent = notesText;
+    notesPreview.style.cursor = 'pointer';
+    notesPreview.onclick = () => {
+      notesExpanded.classList.toggle('hidden');
+    };
+  } else {
+    notesPreview.textContent = '-';
+    notesExpanded.classList.add('hidden');
+  }
 
   // Display download links
   displayDownloadLinks(data.downloadLinks || []);
@@ -775,33 +931,81 @@ downloadBtn.addEventListener('click', async () => {
   clearButtonLoading(downloadBtn);
 });
 
-// Copy button click
-copyBtn.addEventListener('click', async () => {
+// Copy button - toggle dropdown
+const copyDropdown = document.getElementById('copy-dropdown');
+const copyAllBtn = document.getElementById('copy-all-btn');
+const copySpreadsheetBtn = document.getElementById('copy-spreadsheet-btn');
+const copyNotesBtn = document.getElementById('copy-notes-btn');
+
+copyBtn.addEventListener('click', () => {
   if (!currentExtraction) {
     showToast('No extraction data to copy', 'warning');
     return;
   }
+  copyDropdown.classList.toggle('hidden');
+});
 
-  const text = createSummaryText(currentExtraction);
+// Close copy dropdown when clicking outside
+document.addEventListener('click', (e) => {
+  if (!copyBtn.contains(e.target) && !copyDropdown.contains(e.target)) {
+    copyDropdown.classList.add('hidden');
+  }
+});
+
+// Copy All Info
+copyAllBtn.addEventListener('click', async () => {
+  if (!currentExtraction) return;
+  try {
+    await navigator.clipboard.writeText(createSummaryText(currentExtraction));
+    showToast('All bid info copied', 'success', 2000);
+    flashButtonSuccess(copyBtn);
+  } catch (error) {
+    showToast('Failed to copy', 'error');
+  }
+  copyDropdown.classList.add('hidden');
+});
+
+// Copy for Spreadsheet (tab-separated)
+copySpreadsheetBtn.addEventListener('click', async () => {
+  if (!currentExtraction) return;
+  const d = currentExtraction;
+  const row = [
+    d.project || '',
+    d.gcCompany || d.gc || '',
+    d.projectManager || '',
+    d.bidDate || '',
+    d.bidTime || '',
+    d.location || '',
+    d.scope || '',
+    d.gcEmail || d.email || '',
+    d.gcPhone || d.phone || '',
+    d.attachments?.length || 0,
+    d.bondRequirements || '',
+    d.submissionInstructions || ''
+  ].join('\t');
 
   try {
-    await navigator.clipboard.writeText(text);
-    copyBtn.textContent = 'copied!';
+    await navigator.clipboard.writeText(row);
+    showToast('Copied for spreadsheet', 'success', 2000);
     flashButtonSuccess(copyBtn);
-    showToast('Bid info copied to clipboard', 'success', 2000);
-    setTimeout(() => {
-      copyBtn.innerHTML = `
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-        </svg>
-        copy
-      `;
-    }, 2000);
   } catch (error) {
-    console.error('Copy error:', error);
-    showToast('Failed to copy to clipboard', 'error');
+    showToast('Failed to copy', 'error');
   }
+  copyDropdown.classList.add('hidden');
+});
+
+// Copy Notes Only
+copyNotesBtn.addEventListener('click', async () => {
+  if (!currentExtraction) return;
+  const notes = currentExtraction.generalNotes || currentExtraction.notes || '';
+  try {
+    await navigator.clipboard.writeText(notes);
+    showToast('Notes copied', 'success', 2000);
+    flashButtonSuccess(copyBtn);
+  } catch (error) {
+    showToast('Failed to copy', 'error');
+  }
+  copyDropdown.classList.add('hidden');
 });
 
 // Create folder name from pattern
@@ -828,26 +1032,54 @@ function sanitizeFileName(name) {
 
 // Create summary text
 function createSummaryText(data) {
-  return `BID INFORMATION
-================
-Extracted: ${new Date().toLocaleString()}
+  const lines = [
+    'BID INFORMATION',
+    '================',
+    `Extracted: ${new Date().toLocaleString()}`,
+    '',
+    `Project: ${data.project || 'N/A'}`,
+    `General Contractor: ${data.gcCompany || data.gc || 'N/A'}`,
+    `Project Manager: ${data.projectManager || 'N/A'}`,
+    `Bid Date: ${data.bidDate || 'N/A'}`,
+    `Bid Time: ${data.bidTime || 'N/A'}`,
+    `Location: ${data.location || 'N/A'}`,
+    `Scope: ${data.scope || 'N/A'}`,
+    '',
+    `Contact: ${data.contact || 'N/A'}`,
+    `Email: ${data.gcEmail || data.email || 'N/A'}`,
+    `Phone: ${data.gcPhone || data.phone || 'N/A'}`,
+  ];
 
-Project: ${data.project || 'N/A'}
-General Contractor: ${data.gc || 'N/A'}
-Bid Date: ${data.bidDate || 'N/A'}
-Location: ${data.location || 'N/A'}
-Scope: ${data.scope || 'N/A'}
+  if (data.submissionInstructions) {
+    lines.push('', `Submission Instructions: ${data.submissionInstructions}`);
+  }
 
-Contact: ${data.contact || 'N/A'}
-Email: ${data.email || 'N/A'}
-Phone: ${data.phone || 'N/A'}
+  if (data.bondRequirements) {
+    lines.push(`Bond Requirements: ${data.bondRequirements}`);
+  }
 
-Attachments:
-${data.attachments?.map(a => `- ${a.name}`).join('\n') || 'None'}
+  if (data.preBidMeeting?.date) {
+    lines.push('', 'Pre-Bid Meeting:');
+    lines.push(`  Date: ${data.preBidMeeting.date}`);
+    if (data.preBidMeeting.location) lines.push(`  Location: ${data.preBidMeeting.location}`);
+    lines.push(`  Mandatory: ${data.preBidMeeting.mandatory ? 'Yes' : 'No'}`);
+  }
 
-Notes:
-${data.notes || ''}
-`;
+  if (data.addenda?.length) {
+    lines.push('', 'Addenda:');
+    data.addenda.forEach(a => lines.push(`  - ${a}`));
+  }
+
+  lines.push(
+    '',
+    'Attachments:',
+    data.attachments?.map(a => `- ${a.name}`).join('\n') || 'None',
+    '',
+    'Notes:',
+    data.generalNotes || data.notes || ''
+  );
+
+  return lines.join('\n');
 }
 
 // ===== PROJECT INFO SHEET (HTML) =====
@@ -1024,11 +1256,15 @@ function createProjectInfoSheet(data) {
       </tr>
       <tr>
         <td>General Contractor</td>
-        <td>${escapeHtml(data.gc || 'N/A')}</td>
+        <td>${escapeHtml(data.gcCompany || data.gc || 'N/A')}</td>
+      </tr>
+      <tr>
+        <td>Project Manager</td>
+        <td>${escapeHtml(data.projectManager || 'N/A')}</td>
       </tr>
       <tr class="bid-date-row">
         <td>Bid Date / Deadline</td>
-        <td>📅 ${escapeHtml(data.bidDate || 'N/A')}</td>
+        <td>📅 ${escapeHtml(data.bidDate || 'N/A')}${data.bidTime ? ' @ ' + escapeHtml(data.bidTime) : ''}</td>
       </tr>
       <tr>
         <td>Project Location</td>
@@ -1038,6 +1274,14 @@ function createProjectInfoSheet(data) {
         <td>Scope of Work</td>
         <td>${escapeHtml(data.scope || 'N/A')}</td>
       </tr>
+      ${data.submissionInstructions ? `<tr>
+        <td>Submission Instructions</td>
+        <td>${escapeHtml(data.submissionInstructions)}</td>
+      </tr>` : ''}
+      ${data.bondRequirements ? `<tr>
+        <td>Bond Requirements</td>
+        <td>${escapeHtml(data.bondRequirements)}</td>
+      </tr>` : ''}
     </table>
   </div>
 
@@ -1046,15 +1290,15 @@ function createProjectInfoSheet(data) {
     <table>
       <tr>
         <td>Contact Name</td>
-        <td>${escapeHtml(data.contact || 'N/A')}</td>
+        <td>${escapeHtml(data.projectManager || data.contact || 'N/A')}</td>
       </tr>
       <tr>
         <td>Email</td>
-        <td><a href="mailto:${escapeHtml(data.email || '')}">${escapeHtml(data.email || 'N/A')}</a></td>
+        <td><a href="mailto:${escapeHtml(data.gcEmail || data.email || '')}">${escapeHtml(data.gcEmail || data.email || 'N/A')}</a></td>
       </tr>
       <tr>
         <td>Phone</td>
-        <td>${escapeHtml(data.phone || 'N/A')}</td>
+        <td>${escapeHtml(data.gcPhone || data.phone || 'N/A')}</td>
       </tr>
     </table>
   </div>
@@ -1086,7 +1330,7 @@ function createProjectInfoSheet(data) {
   <div class="section">
     <div class="section-title">📝 Notes</div>
     <div class="notes-area">
-      ${escapeHtml(data.notes || '')}
+      ${escapeHtml(data.generalNotes || data.notes || '')}
       &nbsp;
     </div>
   </div>
@@ -1396,12 +1640,13 @@ function createCalendarEvent(data) {
   // Default to today + 7 days if no valid date
   const eventDate = bidDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
-  // Extract time if present, otherwise default to 2 PM
+  // Extract time from bidTime field, bidDate, or default to 2 PM
   let hours = 14;
   let minutes = 0;
 
-  if (data.bidDate) {
-    const timeMatch = data.bidDate.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
+  const timeSource = data.bidTime || data.bidDate || '';
+  if (timeSource) {
+    const timeMatch = timeSource.match(/(\d{1,2}):(\d{2})\s*(am|pm)?/i);
     if (timeMatch) {
       hours = parseInt(timeMatch[1]);
       minutes = parseInt(timeMatch[2]);
@@ -1418,13 +1663,14 @@ function createCalendarEvent(data) {
   return {
     title: `BID DUE: ${data.project || 'Unknown Project'}`,
     description: `Project: ${data.project || 'N/A'}
-General Contractor: ${data.gc || 'N/A'}
+General Contractor: ${data.gcCompany || data.gc || 'N/A'}
+Project Manager: ${data.projectManager || 'N/A'}
 Location: ${data.location || 'N/A'}
 Scope: ${data.scope || 'N/A'}
-
-Contact: ${data.contact || 'N/A'}
-Email: ${data.email || 'N/A'}
-Phone: ${data.phone || 'N/A'}
+${data.submissionInstructions ? `\nSubmission: ${data.submissionInstructions}` : ''}
+Contact: ${data.projectManager || data.contact || 'N/A'}
+Email: ${data.gcEmail || data.email || 'N/A'}
+Phone: ${data.gcPhone || data.phone || 'N/A'}
 
 Attachments: ${data.attachments?.length || 0} file(s)`,
     location: data.location || '',
