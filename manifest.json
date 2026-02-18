@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Bid Extractor",
   "version": "1.5.0",
-  "description": "Matrix-themed bid extraction with priority scoring, dashboard stats, and digital rain animation. Extract RFQ data from Gmail, Outlook, BuildingConnected, PlanHub, Procore.",
+  "description": "Matrix-themed bid extraction with priority scoring, dashboard stats, and digital rain animation. Extract RFQ data from Gmail, Outlook, BuildingConnected, PlanHub, Procore, SmartBidNet, PipelineSuite.",
   "permissions": [
     "activeTab",
     "storage",
@@ -18,7 +18,9 @@
     "https://*.buildingconnected.com/*",
     "https://app.buildingconnected.com/*",
     "https://*.planhub.com/*",
-    "https://*.procore.com/*"
+    "https://*.procore.com/*",
+    "https://*.smartbidnet.com/*",
+    "https://*.pipelinesuite.com/*"
   ],
   "action": {
     "default_popup": "src/popup/popup.html",
@@ -68,6 +70,14 @@
     {
       "matches": ["https://*.procore.com/*"],
       "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/procore.js"]
+    },
+    {
+      "matches": ["https://*.smartbidnet.com/*"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/smartbidnet.js"]
+    },
+    {
+      "matches": ["https://*.pipelinesuite.com/*"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/pipelinesuite.js"]
     }
   ],
   "web_accessible_resources": [
@@ -85,7 +95,9 @@
         "https://*.buildingconnected.com/*",
         "https://app.buildingconnected.com/*",
         "https://*.planhub.com/*",
-        "https://*.procore.com/*"
+        "https://*.procore.com/*",
+        "https://*.smartbidnet.com/*",
+        "https://*.pipelinesuite.com/*"
       ]
     },
     {
