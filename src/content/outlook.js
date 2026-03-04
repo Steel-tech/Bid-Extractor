@@ -2,16 +2,21 @@
 // Outlook Content Script for Bid Extractor
 // TODO: Enable type checking after incremental migration
 
-// Config storage (loaded on init)
+// Config storage (loaded on init via shared ConfigLoader)
 let SELECTORS = null;
 let PLATFORMS = null;
 
-// Load configs on script init
+// Load configs using the shared ConfigLoader (injected before this script)
 (async function initConfigs() {
   try {
+    const loader = window.ConfigLoader;
+    if (!loader) {
+      console.warn('Bid Extractor: ConfigLoader not available, using defaults');
+      return;
+    }
     const [selectorsConfig, platformsConfig] = await Promise.all([
-      fetch(chrome.runtime.getURL('src/config/selectors.json')).then(r => r.json()),
-      fetch(chrome.runtime.getURL('src/config/platforms.json')).then(r => r.json())
+      loader.loadConfig('selectors'),
+      loader.loadConfig('platforms')
     ]);
     SELECTORS = selectorsConfig.outlook;
     PLATFORMS = {

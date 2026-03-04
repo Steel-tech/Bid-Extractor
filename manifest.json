@@ -83,8 +83,14 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "src/config/*.json",
-        "src/utils/*.js"
+        "src/config/gc-list.json",
+        "src/config/keywords.json",
+        "src/config/priority-weights.json",
+        "src/config/selectors.json",
+        "src/config/platforms.json",
+        "src/config/blueprint-settings.json",
+        "src/utils/config-loader.js",
+        "src/utils/safe-query.js"
       ],
       "matches": [
         "https://mail.google.com/*",
@@ -102,8 +108,16 @@
     },
     {
       "resources": [
-        "src/blueprint/*",
-        "src/lib/*.js"
+        "src/blueprint/ocr-service.js",
+        "src/blueprint/annotations.js",
+        "src/blueprint/member-detector.js",
+        "src/blueprint/steel-database.js",
+        "src/blueprint/takeoff.js",
+        "src/blueprint/viewer.css",
+        "src/blueprint/viewer.html",
+        "src/blueprint/viewer.js",
+        "src/lib/pdf.min.js",
+        "src/lib/pdf.worker.min.js"
       ],
       "matches": ["<all_urls>"]
     }
