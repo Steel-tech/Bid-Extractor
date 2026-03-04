@@ -467,6 +467,7 @@ const PLATFORM_SITES = [
   { pattern: 'planhub.com', type: 'platform', name: 'PlanHub', action: 'extractDocuments' },
   { pattern: 'procore.com', type: 'platform', name: 'Procore', action: 'extractDocuments' },
   { pattern: 'smartbidnet.com', type: 'platform', name: 'SmartBid', action: 'extractDocuments' },
+  { pattern: 'smartbid.co', type: 'platform', name: 'SmartBid', action: 'extractDocuments' },
   { pattern: 'pipelinesuite.com', type: 'platform', name: 'PipelineSuite', action: 'extractDocuments' },
 ];
 

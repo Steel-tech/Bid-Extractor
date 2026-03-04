@@ -20,6 +20,7 @@
     "https://*.planhub.com/*",
     "https://*.procore.com/*",
     "https://*.smartbidnet.com/*",
+    "https://*.smartbid.co/*",
     "https://*.pipelinesuite.com/*"
   ],
   "action": {
@@ -72,7 +73,7 @@
       "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/procore.js"]
     },
     {
-      "matches": ["https://*.smartbidnet.com/*"],
+      "matches": ["https://*.smartbidnet.com/*", "https://*.smartbid.co/*"],
       "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/smartbidnet.js"]
     },
     {
@@ -103,6 +104,7 @@
         "https://*.planhub.com/*",
         "https://*.procore.com/*",
         "https://*.smartbidnet.com/*",
+        "https://*.smartbid.co/*",
         "https://*.pipelinesuite.com/*"
       ]
     },

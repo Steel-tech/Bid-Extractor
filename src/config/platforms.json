@@ -8,6 +8,7 @@
     "isqft.com": { "name": "iSqFt", "icon": "\ud83d\udcca" },
     "procore.com": { "name": "Procore", "icon": "\ud83d\udd37" },
     "smartbidnet.com": { "name": "SmartBid", "icon": "\ud83d\udca1" },
+    "smartbid.co": { "name": "SmartBid", "icon": "\ud83d\udca1" },
     "construction.com": { "name": "Dodge/Construction", "icon": "\ud83d\udd36" },
     "constructconnect.com": { "name": "ConstructConnect", "icon": "\ud83d\udd17" },
     "plangrid.com": { "name": "PlanGrid", "icon": "\ud83d\udcf1" },

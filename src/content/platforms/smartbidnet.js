@@ -677,16 +677,20 @@
     init();
   }
 
-  // SmartBidNet is not a SPA, but some pages use partial postbacks.
-  // Watch for content changes from ASP.NET UpdatePanel async postbacks.
+  // Watch for content changes from ASP.NET UpdatePanel async postbacks
+  // or SPA hash-based navigation (smartbid.co uses /#/ routes)
   const bodyContent = document.getElementById('divBodyContent');
   if (bodyContent) {
     new MutationObserver(() => {
-      // Content refreshed via UpdatePanel; re-initialize if needed
       if (!document.getElementById('bid-extractor-sbn-btn')) {
         init();
       }
     }).observe(bodyContent, { subtree: true, childList: true });
   }
+
+  // smartbid.co uses hash-based SPA routing — re-init on navigation
+  window.addEventListener('hashchange', () => {
+    setTimeout(init, 1500);
+  });
 
 })();
