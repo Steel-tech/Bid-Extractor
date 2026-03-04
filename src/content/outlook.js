@@ -210,6 +210,12 @@ function extractEmailFromText(text) {
   return match?.[1] || '';
 }
 
+// Check if text looks like a greeting rather than a project name
+function isGreeting(text) {
+  const cleaned = text.replace(/^[:\-\s]+|[:\-\s,]+$/g, '').trim();
+  return /^(Hello|Hi|Hey|Dear|Good\s+(morning|afternoon|evening))\b/i.test(cleaned);
+}
+
 // Extract project name
 function extractProjectName(subject, body) {
   const patterns = [
@@ -221,10 +227,18 @@ function extractProjectName(subject, body) {
   for (const pattern of patterns) {
     const match = subject.match(pattern);
     if (match?.[1]) {
-      return cleanText(match[1]);
+      const result = cleanText(match[1]);
+      if (!isGreeting(result)) return result;
     }
   }
 
+  // Fallback: use subject without common prefixes, but reject greetings
+  const fallback = cleanText(subject.replace(/^(RE:|FW:|RFQ|RFP|ITB)[:\s]*/gi, ''));
+  if (!isGreeting(fallback) && fallback.length > 3) {
+    return fallback;
+  }
+
+  // Subject was a greeting — try body for explicit project/job name fields
   const bodyPatterns = [
     /Project(?:\s+Name)?[:\s]+(.+?)(?:\n|$)/i,
     /Job(?:\s+Name)?[:\s]+(.+?)(?:\n|$)/i,
@@ -233,11 +247,12 @@ function extractProjectName(subject, body) {
   for (const pattern of bodyPatterns) {
     const match = body.match(pattern);
     if (match?.[1]) {
-      return cleanText(match[1]);
+      const result = cleanText(match[1]);
+      if (!isGreeting(result) && result.length > 3) return result;
     }
   }
 
-  return cleanText(subject.replace(/^(RE:|FW:|RFQ|RFP|ITB)[:\s]*/gi, ''));
+  return 'Untitled Project';
 }
 
 // Extract GC name

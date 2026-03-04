@@ -38,6 +38,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       sendResponse({ success: true });
       return true;
 
+    case 'enrichFromPlatform':
+      enrichFromPlatform(request.url)
+        .then(result => sendResponse(result))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     // Blueprint-related actions
     case 'openBlueprintViewer':
       openBlueprintViewer(request.url, request.filename);
@@ -247,6 +253,74 @@ ${data.attachments?.map(a => `- ${a.name}`).join('\n') || 'None'}
 
 Original Subject: ${data.rawSubject || 'N/A'}
 `;
+}
+
+// Enrich extraction by opening a platform page in a background tab
+async function enrichFromPlatform(url) {
+  const TIMEOUT_MS = 15000;
+  const CONTENT_SCRIPT_DELAY_MS = 2000;
+
+  return new Promise((resolve, reject) => {
+    let tabId = null;
+    let settled = false;
+
+    const cleanup = () => {
+      if (tabId !== null) {
+        chrome.tabs.remove(tabId).catch(() => {});
+      }
+    };
+
+    const settle = (value) => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      resolve(value);
+    };
+
+    const timeout = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        cleanup();
+        resolve({ success: false, error: 'Platform page load timed out' });
+      }
+    }, TIMEOUT_MS);
+
+    chrome.tabs.create({ url, active: false }, (tab) => {
+      if (chrome.runtime.lastError) {
+        clearTimeout(timeout);
+        return resolve({ success: false, error: chrome.runtime.lastError.message });
+      }
+
+      tabId = tab.id;
+
+      const onUpdated = (updatedTabId, changeInfo) => {
+        if (updatedTabId !== tabId || changeInfo.status !== 'complete') return;
+        chrome.tabs.onUpdated.removeListener(onUpdated);
+
+        // Wait for content script to initialize and dynamic content to load
+        setTimeout(() => {
+          chrome.tabs.sendMessage(tabId, { action: 'extractDocuments' }, (response) => {
+            clearTimeout(timeout);
+            if (chrome.runtime.lastError) {
+              settle({ success: false, error: chrome.runtime.lastError.message });
+              return;
+            }
+            if (response?.success) {
+              settle({
+                success: true,
+                projectInfo: response.projectInfo || {},
+                documents: response.documents || []
+              });
+            } else {
+              settle({ success: false, error: response?.error || 'No data extracted' });
+            }
+          });
+        }, CONTENT_SCRIPT_DELAY_MS);
+      };
+
+      chrome.tabs.onUpdated.addListener(onUpdated);
+    });
+  });
 }
 
 // Install handler

@@ -541,6 +541,55 @@ extractBtn.addEventListener('click', async () => {
   clearButtonLoading(extractBtn);
 });
 
+// Check if a string looks like a greeting rather than a project name
+function isGreeting(text) {
+  if (!text) return false;
+  const greetingPatterns = /^(hello|hi|hey|dear|good\s+(morning|afternoon|evening))\b/i;
+  return greetingPatterns.test(text.trim());
+}
+
+// Check if email extraction produced weak/incomplete data
+function needsPlatformEnrichment(data) {
+  if (!data) return false;
+  const weakProject = !data.project ||
+    data.project === 'Untitled Project' ||
+    isGreeting(data.project);
+  const missingBidDate = !data.bidDate;
+  return weakProject || missingBidDate;
+}
+
+// Merge platform-extracted projectInfo into email extraction, only overwriting weak fields
+function mergeProjectInfo(extraction, platformInfo) {
+  if (!platformInfo) return;
+
+  // Project name: override if weak
+  if (platformInfo.projectName &&
+    (!extraction.project || extraction.project === 'Untitled Project' || isGreeting(extraction.project))) {
+    extraction.project = platformInfo.projectName;
+  }
+
+  // Other fields: override only if currently empty
+  if (platformInfo.gc && !extraction.gc && !extraction.gcCompany) {
+    extraction.gc = platformInfo.gc;
+    extraction.gcCompany = platformInfo.gc;
+  }
+  if (platformInfo.bidDate && !extraction.bidDate) {
+    extraction.bidDate = platformInfo.bidDate;
+  }
+  if (platformInfo.bidTime && !extraction.bidTime) {
+    extraction.bidTime = platformInfo.bidTime;
+  }
+  if (platformInfo.location && !extraction.location) {
+    extraction.location = platformInfo.location;
+  }
+  if (platformInfo.scope && !extraction.scope) {
+    extraction.scope = platformInfo.scope;
+  }
+  if (platformInfo.notes && !extraction.notes && !extraction.generalNotes) {
+    extraction.notes = platformInfo.notes;
+  }
+}
+
 function handleEmailResponse(response) {
   if (response?.success) {
     currentExtraction = response.data;
@@ -549,6 +598,31 @@ function handleEmailResponse(response) {
 
     (async () => {
       try {
+        // Check if extraction needs enrichment from a platform link
+        const platformLinks = (currentExtraction.downloadLinks || [])
+          .filter(l => l.type === 'platform');
+
+        if (needsPlatformEnrichment(currentExtraction) && platformLinks.length > 0) {
+          const link = platformLinks[0];
+          setStatus('loading', `Fetching details from ${link.platform || 'platform'}...`);
+
+          try {
+            const result = await chrome.runtime.sendMessage({
+              action: 'enrichFromPlatform',
+              url: link.url
+            });
+
+            if (result?.success && result.projectInfo) {
+              mergeProjectInfo(currentExtraction, result.projectInfo);
+              displayExtraction(currentExtraction);
+              saveExtraction(currentExtraction);
+            }
+          } catch (enrichErr) {
+            console.warn('Platform enrichment failed:', enrichErr);
+            // Continue with original extraction data — not a fatal error
+          }
+        }
+
         const settings = await chrome.storage.local.get(['folderPattern', 'createSummary']);
         const folderPattern = settings.folderPattern || 'Bids/{gc}_{date}_{project}';
         const folderName = createFolderName(folderPattern, currentExtraction);
