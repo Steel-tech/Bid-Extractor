@@ -33,13 +33,24 @@ const configReady = (async function initConfigs() {
 
 // Shared helpers (loaded before this script)
 const SE = window.SharedExtractors || {};
+console.log('Bid Extractor: SharedExtractors available:', !!window.SharedExtractors);
+console.log('Bid Extractor: ConfigLoader available:', !!window.ConfigLoader);
+console.log('Bid Extractor: SafeQuery available:', !!window.SafeQuery);
+console.log('Bid Extractor: EmailParser available:', typeof EmailParser !== 'undefined');
 
 // Listen for messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('Bid Extractor: Received message:', request.action);
   if (request.action === 'extract') {
     extractBidInfo()
-      .then(data => sendResponse({ success: true, data }))
-      .catch(error => sendResponse({ success: false, error: error.message }));
+      .then(data => {
+        console.log('Bid Extractor: Extraction successful, project:', data.project);
+        sendResponse({ success: true, data });
+      })
+      .catch(error => {
+        console.error('Bid Extractor: Extraction FAILED:', error.message, error.stack);
+        sendResponse({ success: false, error: error.message });
+      });
     return true;
   }
 });
@@ -55,6 +66,9 @@ async function extractBidInfo() {
   }
 
   console.log('Bid Extractor: Starting extraction...');
+  console.log('Bid Extractor: SELECTORS loaded:', !!SELECTORS);
+  console.log('Bid Extractor: PLATFORMS loaded:', !!PLATFORMS);
+  console.log('Bid Extractor: SharedExtractors check:', !!window.SharedExtractors, Object.keys(window.SharedExtractors || {}).length, 'functions');
 
   const containerSelector = SELECTORS?.container?.primary || '[role="main"]';
   const bodySelectors = SELECTORS?.body || [

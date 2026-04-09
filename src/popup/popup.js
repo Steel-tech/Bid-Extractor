@@ -245,7 +245,9 @@ extractBtn.addEventListener('click', async () => {
       return;
     }
 
+    console.log('Sending message to tab', tab.id, ':', currentSite.action);
     const response = await chrome.tabs.sendMessage(tab.id, { action: currentSite.action });
+    console.log('Got response:', response);
 
     if (currentSite.type === 'email') {
       handleEmailResponse(response);
@@ -253,10 +255,10 @@ extractBtn.addEventListener('click', async () => {
       handlePlatformResponse(response);
     }
   } catch (error) {
-    console.error('Extraction error:', error);
-    if (error.message?.includes('Receiving end does not exist')) {
-      setStatus('error', 'Refresh page first');
-      UI.showToast('Refresh the page first', 'error');
+    console.error('Extraction error:', error.message, error.stack);
+    if (error.message?.includes('Receiving end does not exist') || error.message?.includes('Could not establish connection')) {
+      setStatus('error', 'Refresh Gmail tab first');
+      UI.showToast('Content script not loaded. Close this popup, refresh your Gmail tab (F5), then try again.', 'error', 6000);
     } else {
       setStatus('error', error.message || 'Try refreshing page');
       UI.showToast(error.message || 'Try refreshing the page', 'error');
