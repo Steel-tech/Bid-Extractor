@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Bid Extractor",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Matrix-themed bid extraction with priority scoring, dashboard stats, and digital rain animation. Extract RFQ data from Gmail, Outlook, BuildingConnected, PlanHub, Procore, SmartBidNet, PipelineSuite.",
   "permissions": [
     "activeTab",

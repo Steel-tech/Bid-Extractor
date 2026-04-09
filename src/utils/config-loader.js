@@ -1,13 +1,19 @@
 // @ts-nocheck
-// Config Loader for Bid Extractor
-// Loads JSON config files and caches them
-// Uses XMLHttpRequest (synchronous fallback) because fetch() on chrome-extension:// URLs
-// can fail in MV3 content scripts due to host page CSP or extension context issues.
+// Config Loader for Bid Extractor v2
+// Loads JSON config files via background service worker messaging.
+//
+// Why not fetch()? In MV3, content scripts run in an isolated world but their
+// fetch/XHR requests can still be blocked by the host page's CSP (Gmail, Outlook, etc.).
+// The background service worker always has unrestricted access to extension resources,
+// so we route config loading through it as the primary strategy.
 
 const configCache = new Map();
 
 /**
- * Load a config file from the extension's config directory
+ * Load a config file from the extension's config directory.
+ * Primary: asks background service worker (always works).
+ * Fallback: direct fetch (works in popup context).
+ *
  * @param {string} configName - Name of the config file (without .json extension)
  * @returns {Promise<Object>} The parsed config object
  */
@@ -17,33 +23,7 @@ async function loadConfig(configName) {
     return configCache.get(configName);
   }
 
-  const url = chrome.runtime.getURL(`src/config/${configName}.json`);
-
-  // Strategy 1: Try fetch() first (works in popup and some content script contexts)
-  try {
-    const response = await fetch(url);
-    if (response.ok) {
-      const config = await response.json();
-      configCache.set(configName, config);
-      return config;
-    }
-  } catch (fetchErr) {
-    // fetch() failed — fall through to XMLHttpRequest
-    console.warn(`Config Loader: fetch() failed for ${configName}, trying XHR...`);
-  }
-
-  // Strategy 2: Synchronous XMLHttpRequest (reliable in content scripts)
-  try {
-    const config = loadConfigSync(url);
-    if (config) {
-      configCache.set(configName, config);
-      return config;
-    }
-  } catch (xhrErr) {
-    console.error(`Config Loader: XHR also failed for ${configName}:`, xhrErr);
-  }
-
-  // Strategy 3: Ask background script to load it
+  // Strategy 1: Ask background service worker to load it (most reliable for content scripts)
   try {
     const config = await loadConfigViaBackground(configName);
     if (config) {
@@ -51,42 +31,61 @@ async function loadConfig(configName) {
       return config;
     }
   } catch (bgErr) {
-    console.error(`Config Loader: Background fallback failed for ${configName}:`, bgErr);
+    console.warn('Config Loader: background strategy failed for ' + configName + ':', bgErr.message || bgErr);
   }
 
-  throw new Error(`Failed to load config: ${configName} (all strategies failed)`);
+  // Strategy 2: Direct fetch (works in popup and extension pages)
+  try {
+    const url = chrome.runtime.getURL('src/config/' + configName + '.json');
+    const response = await fetch(url);
+    if (response.ok) {
+      const config = await response.json();
+      configCache.set(configName, config);
+      return config;
+    }
+  } catch (fetchErr) {
+    console.warn('Config Loader: fetch() failed for ' + configName + ':', fetchErr.message || fetchErr);
+  }
+
+  // Strategy 3: Synchronous XHR (last resort)
+  try {
+    const url = chrome.runtime.getURL('src/config/' + configName + '.json');
+    const xhr = new XMLHttpRequest();
+    xhr.open('GET', url, false);
+    xhr.send();
+    if (xhr.status === 200 || xhr.status === 0) {
+      const config = JSON.parse(xhr.responseText);
+      configCache.set(configName, config);
+      return config;
+    }
+  } catch (xhrErr) {
+    console.warn('Config Loader: XHR failed for ' + configName + ':', xhrErr.message || xhrErr);
+  }
+
+  console.error('Config Loader: ALL strategies failed for ' + configName);
+  throw new Error('Failed to load config: ' + configName);
 }
 
 /**
- * Load config synchronously via XMLHttpRequest
- * @param {string} url - chrome-extension:// URL
- * @returns {Object|null}
- */
-function loadConfigSync(url) {
-  const xhr = new XMLHttpRequest();
-  xhr.open('GET', url, false); // synchronous
-  xhr.send();
-  if (xhr.status === 200 || xhr.status === 0) { // status 0 is normal for chrome-extension:// URLs
-    return JSON.parse(xhr.responseText);
-  }
-  return null;
-}
-
-/**
- * Load config by asking the background service worker
+ * Load config by asking the background service worker.
+ * Background can always fetch its own extension resources.
  * @param {string} configName
  * @returns {Promise<Object>}
  */
 function loadConfigViaBackground(configName) {
-  return new Promise((resolve, reject) => {
+  return new Promise(function(resolve, reject) {
+    if (!chrome.runtime || !chrome.runtime.sendMessage) {
+      return reject(new Error('chrome.runtime.sendMessage not available'));
+    }
     try {
-      chrome.runtime.sendMessage({ action: 'loadConfig', configName }, (response) => {
+      chrome.runtime.sendMessage({ action: 'loadConfig', configName: configName }, function(response) {
         if (chrome.runtime.lastError) {
-          reject(chrome.runtime.lastError);
-        } else if (response?.success) {
+          return reject(new Error(chrome.runtime.lastError.message));
+        }
+        if (response && response.success && response.config) {
           resolve(response.config);
         } else {
-          reject(new Error(response?.error || 'Background config load failed'));
+          reject(new Error((response && response.error) || 'No config in response'));
         }
       });
     } catch (e) {
@@ -103,7 +102,7 @@ function loadConfigViaBackground(configName) {
 async function loadConfigs(configNames) {
   const results = {};
   await Promise.all(
-    configNames.map(async (name) => {
+    configNames.map(async function(name) {
       results[name] = await loadConfig(name);
     })
   );
@@ -131,7 +130,7 @@ function clearConfigCache() {
  * @returns {Promise<Object>} All loaded configs
  */
 async function preloadAllConfigs() {
-  const configNames = [
+  var configNames = [
     'gc-list',
     'keywords',
     'priority-weights',
@@ -141,13 +140,13 @@ async function preloadAllConfigs() {
   return loadConfigs(configNames);
 }
 
-// Export for use in modules (ES6) or global scope (classic scripts)
+// Export for use in content scripts and popup
 if (typeof window !== 'undefined') {
   window.ConfigLoader = {
-    loadConfig,
-    loadConfigs,
-    getCachedConfig,
-    clearConfigCache,
-    preloadAllConfigs
+    loadConfig: loadConfig,
+    loadConfigs: loadConfigs,
+    getCachedConfig: getCachedConfig,
+    clearConfigCache: clearConfigCache,
+    preloadAllConfigs: preloadAllConfigs
   };
 }

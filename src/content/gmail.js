@@ -278,4 +278,4 @@ observer.observe(document.body, {
 
 setTimeout(injectExtractButton, 2000);
 
-console.log('Bid Extractor: Gmail content script loaded');
+console.log('Bid Extractor v1.5.1: Gmail content script loaded');
