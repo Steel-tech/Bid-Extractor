@@ -7,6 +7,10 @@
 
   console.log('🏗️ Bid Extractor: Procore script loaded');
 
+  if (!window.PlatformHelpers) {
+    console.error('Bid Extractor: PlatformHelpers module not loaded — Procore script cannot initialize');
+    return;
+  }
   const PH = window.PlatformHelpers;
 
   // State

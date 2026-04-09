@@ -6,8 +6,8 @@
 let SELECTORS = null;
 let PLATFORMS = null;
 
-// Load configs using the shared ConfigLoader (injected before this script)
-(async function initConfigs() {
+// Config readiness promise — extractBidInfo() awaits this before using SELECTORS/PLATFORMS
+const configReady = (async function initConfigs() {
   try {
     const loader = window.ConfigLoader;
     if (!loader) {
@@ -46,6 +46,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Main extraction function
 async function extractBidInfo() {
+  // Wait for configs with a 3-second timeout so extraction doesn't hang
+  await Promise.race([configReady, new Promise(r => setTimeout(r, 3000))]);
+
+  // Guard: SharedExtractors must be available
+  if (!window.SharedExtractors) {
+    throw new Error('Bid Extractor: SharedExtractors module failed to load — try refreshing the page');
+  }
+
   console.log('Bid Extractor: Starting extraction...');
 
   const containerSelector = SELECTORS?.container?.primary || '[role="main"]';
@@ -254,7 +262,7 @@ function injectExtractButton() {
 }
 
 // Watch for email opens with debounce
-const debouncedInject = SE.debounce ? SE.debounce(injectExtractButton, 300) : injectExtractButton;
+const debouncedInject = SE.debounce ? SE.debounce(injectExtractButton, 500) : injectExtractButton;
 
 const observer = new MutationObserver(() => {
   const emailOpen = document.querySelector('.a3s.aiL') || document.querySelector('[data-message-id]');

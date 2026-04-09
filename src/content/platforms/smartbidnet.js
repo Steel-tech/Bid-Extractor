@@ -8,6 +8,10 @@
 
   console.log('Bid Extractor: SmartBidNet script loaded');
 
+  if (!window.PlatformHelpers) {
+    console.error('Bid Extractor: PlatformHelpers module not loaded — SmartBidNet script cannot initialize');
+    return;
+  }
   const PH = window.PlatformHelpers;
 
   // State

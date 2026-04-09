@@ -201,6 +201,7 @@
    * @returns {string}
    */
   function extractPhone(body) {
+    if (!body || typeof body !== 'string') return '';
     const phoneMatch = body.match(/(?:Phone|Tel|Cell|Mobile|Direct)?[:\s]*(\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4})/i);
     return phoneMatch?.[1] || '';
   }
@@ -211,6 +212,7 @@
    * @returns {string}
    */
   function extractEmailFromText(text) {
+    if (!text || typeof text !== 'string') return '';
     const match = text.match(/([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)/);
     return match?.[1] || '';
   }
@@ -221,6 +223,7 @@
    * @returns {string}
    */
   function getFileType(filename) {
+    if (!filename || typeof filename !== 'string') return 'file';
     const ext = filename.split('.').pop()?.toLowerCase();
     const types = {
       pdf: 'document',

@@ -7,6 +7,14 @@
 
   if (window.PopupCalendar) return;
 
+  // Single month name map shared by all date parsers
+  var MONTH_MAP = {
+    'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
+    'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
+    'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'may': 4, 'jun': 5,
+    'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
+  };
+
   /**
    * Parse bid date string into Date object
    * @param {string} dateStr
@@ -30,12 +38,7 @@
     // Try Month DD, YYYY
     match = dateStr.match(/(\w+)\s+(\d{1,2}),?\s*(\d{4})/);
     if (match) {
-      var months = {
-        'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
-        'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
-        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'jun': 5, 'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
-      };
-      var month = months[match[1].toLowerCase()];
+      var month = MONTH_MAP[match[1].toLowerCase()];
       if (month !== undefined) {
         return new Date(match[3], month, match[2]);
       }
@@ -44,12 +47,7 @@
     // Try DD Month YYYY
     match = dateStr.match(/(\d{1,2})\s+(\w+)\s+(\d{4})/);
     if (match) {
-      var months2 = {
-        'january': 0, 'february': 1, 'march': 2, 'april': 3, 'may': 4, 'june': 5,
-        'july': 6, 'august': 7, 'september': 8, 'october': 9, 'november': 10, 'december': 11,
-        'jan': 0, 'feb': 1, 'mar': 2, 'apr': 3, 'jun': 5, 'jul': 6, 'aug': 7, 'sep': 8, 'oct': 9, 'nov': 10, 'dec': 11
-      };
-      var month2 = months2[match[2].toLowerCase()];
+      var month2 = MONTH_MAP[match[2].toLowerCase()];
       if (month2 !== undefined) {
         return new Date(match[3], month2, match[1]);
       }
@@ -177,7 +175,8 @@
     var uid = 'bid-' + Date.now() + '@bidextractor';
     var now = formatICSDate(new Date());
 
-    return 'BEGIN:VCALENDAR\n' +
+    // RFC 5545 requires CRLF line endings
+    var ics = 'BEGIN:VCALENDAR\n' +
       'VERSION:2.0\n' +
       'PRODID:-//Bid Extractor//Chrome Extension//EN\n' +
       'BEGIN:VEVENT\n' +
@@ -200,6 +199,7 @@
       'END:VALARM\n' +
       'END:VEVENT\n' +
       'END:VCALENDAR';
+    return ics.replace(/\n/g, '\r\n');
   }
 
   // Export
