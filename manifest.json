@@ -44,7 +44,7 @@
   "content_scripts": [
     {
       "matches": ["https://mail.google.com/*"],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/email-parser.js", "src/content/gmail.js"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/shared-extractors.js", "src/content/email-parser.js", "src/content/gmail.js"],
       "css": ["src/content/content.css"]
     },
     {
@@ -54,7 +54,7 @@
         "https://outlook.office365.com/*",
         "https://*.outlook.com/*"
       ],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/email-parser.js", "src/content/outlook.js"],
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/shared-extractors.js", "src/content/email-parser.js", "src/content/outlook.js"],
       "css": ["src/content/content.css"]
     },
     {
@@ -62,23 +62,23 @@
         "https://*.buildingconnected.com/*",
         "https://app.buildingconnected.com/*"
       ],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/buildingconnected.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/platform-helpers.js", "src/content/platforms/buildingconnected.js"]
     },
     {
       "matches": ["https://*.planhub.com/*"],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/planhub.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/platform-helpers.js", "src/content/platforms/planhub.js"]
     },
     {
       "matches": ["https://*.procore.com/*"],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/procore.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/platform-helpers.js", "src/content/platforms/procore.js"]
     },
     {
       "matches": ["https://*.smartbidnet.com/*", "https://*.smartbid.co/*"],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/smartbidnet.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/platform-helpers.js", "src/content/platforms/smartbidnet.js"]
     },
     {
       "matches": ["https://*.pipelinesuite.com/*"],
-      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/content/platforms/pipelinesuite.js"]
+      "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/platform-helpers.js", "src/content/platforms/pipelinesuite.js"]
     }
   ],
   "web_accessible_resources": [
@@ -91,7 +91,9 @@
         "src/config/platforms.json",
         "src/config/blueprint-settings.json",
         "src/utils/config-loader.js",
-        "src/utils/safe-query.js"
+        "src/utils/safe-query.js",
+        "src/utils/shared-extractors.js",
+        "src/utils/platform-helpers.js"
       ],
       "matches": [
         "https://mail.google.com/*",

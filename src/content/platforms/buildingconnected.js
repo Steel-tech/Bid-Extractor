@@ -1,154 +1,77 @@
 // @ts-nocheck
 // BuildingConnected Content Script - Document Extractor
-// Extracts and downloads bid documents from BuildingConnected project pages
+// Uses PlatformHelpers (loaded before this script via manifest)
 
 (function() {
   'use strict';
 
   console.log('🏗️ Bid Extractor: BuildingConnected script loaded');
 
+  const PH = window.PlatformHelpers;
+
   // State
   let extractedDocuments = [];
-  let isExtracting = false;
 
-  // Listen for messages from popup/background
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    console.log('BC received message:', request.action);
-
-    switch (request.action) {
-      case 'extractDocuments':
-        extractDocuments().then(docs => {
-          const info = extractProjectInfo();
-          sendResponse({ success: true, documents: docs, projectInfo: info });
-        }).catch(err => {
-          sendResponse({ success: false, error: err.message });
-        });
-        return true;
-
-      case 'downloadAllDocuments':
-        downloadAllDocuments().then(result => {
-          sendResponse({ success: true, ...result });
-        }).catch(err => {
-          sendResponse({ success: false, error: err.message });
-        });
-        return true;
-
-      case 'getPageInfo':
-        sendResponse({
-          success: true,
-          platform: 'BuildingConnected',
-          url: window.location.href,
-          projectName: getProjectName(),
-          documentCount: extractedDocuments.length
-        });
-        return true;
-
-      default:
-        return false;
-    }
+  // Set up standard message listener
+  PH.createMessageListener({
+    platformName: 'BuildingConnected',
+    extractDocuments: extractDocuments,
+    extractProjectInfo: extractProjectInfo,
+    downloadAllDocuments: doDownloadAll,
+    getProjectName: getProjectName,
+    getDocumentCount: function() { return extractedDocuments.length; }
   });
 
   // Extract project name from page
   function getProjectName() {
-    // Try various selectors for project name
     const selectors = [
-      'h1',
-      '[data-testid="project-name"]',
-      '.project-name',
-      '.opportunity-name',
-      '[class*="ProjectName"]',
-      '[class*="projectName"]'
+      'h1', '[data-testid="project-name"]', '.project-name',
+      '.opportunity-name', '[class*="ProjectName"]', '[class*="projectName"]'
     ];
-
     for (const selector of selectors) {
       const el = document.querySelector(selector);
-      if (el?.textContent?.trim()) {
-        return el.textContent.trim();
-      }
+      if (el?.textContent?.trim()) return el.textContent.trim();
     }
-
-    // Try to get from page title
     const title = document.title;
     if (title && !title.includes('BuildingConnected')) {
       return title.split('|')[0].trim();
     }
-
     return 'Unknown Project';
   }
 
-  // Extract bid/project info from page text
+  // Extract project info
   function extractProjectInfo() {
-    const text = document.body?.innerText || '';
-    const info = {
-      projectName: getProjectName(),
-      gc: '',
-      bidDate: '',
-      bidTime: '',
-      location: '',
-      scope: '',
-      notes: '',
+    const info = PH.extractProjectInfoFromPage({
       source: 'BuildingConnected',
-      url: window.location.href
-    };
-
-    // GC / Company - look for company names near "by", "from", "general contractor", "invited by"
-    const gcPatterns = [
-      /(?:invited by|from|general contractor|gc|owner|company)[:\s]+([A-Z][\w\s&.,'-]{2,60})/im,
-      /(?:posted by|sent by|created by)[:\s]+([A-Z][\w\s&.,'-]{2,60})/im,
-    ];
-    for (const pat of gcPatterns) {
-      const m = text.match(pat);
-      if (m) { info.gc = m[1].trim(); break; }
-    }
-
-    // Bid date - look for date patterns near "due", "bid", "deadline", "submit"
-    const dateBlock = text.match(/(?:due|bid|deadline|submit|response)[^]*?(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|\w+\s+\d{1,2},?\s+\d{4})/im);
-    if (dateBlock) info.bidDate = dateBlock[1].trim();
-
-    // Bid time - look for time near due/bid keywords
-    const timeBlock = text.match(/(?:due|bid|deadline|submit|by)[^]*?(\d{1,2}:\d{2}\s*(?:AM|PM|am|pm|a\.m\.|p\.m\.)?(?:\s*[A-Z]{2,4})?)/im);
-    if (timeBlock) info.bidTime = timeBlock[1].trim();
-
-    // Location - look for address patterns (city, state ZIP or street address)
-    const locPatterns = [
-      /(?:location|address|project location|site|city)[:\s]+([^\n]{5,80})/im,
-      /(\d+\s+[\w\s]+(?:St|Ave|Blvd|Dr|Rd|Way|Ln|Ct|Pkwy|Hwy)\.?[,\s]+[\w\s]+,?\s*[A-Z]{2}\s*\d{5})/m,
-      /([\w\s]+,\s*[A-Z]{2}\s+\d{5})/m,
-    ];
-    for (const pat of locPatterns) {
-      const m = text.match(pat);
-      if (m) { info.location = m[1].trim(); break; }
-    }
-
-    // Scope / Trade
-    const scopePatterns = [
-      /(?:scope|trade|division|csi|work type|bid package)[:\s]+([^\n]{3,120})/im,
-      /(?:structural steel|miscellaneous metals|steel erection|steel fabrication|rebar|reinforcing|metal deck|precast|concrete|masonry|roofing|mechanical|electrical|plumbing|hvac|fire protection|glazing|curtain wall|drywall|framing|painting|flooring|elevator)/im,
-    ];
-    for (const pat of scopePatterns) {
-      const m = text.match(pat);
-      if (m) { info.scope = (m[1] || m[0]).trim(); break; }
-    }
-
-    // Notes / Messages - grab visible message or description blocks
-    const noteSections = document.querySelectorAll(
-      '[class*="message"], [class*="Message"], [class*="description"], [class*="Description"], ' +
-      '[class*="note"], [class*="Note"], [class*="comment"], [class*="Comment"], ' +
-      '[data-testid*="message"], [data-testid*="description"]'
-    );
-    const noteTexts = [];
-    noteSections.forEach(el => {
-      const t = el.innerText?.trim();
-      if (t && t.length > 10 && t.length < 2000) noteTexts.push(t);
+      getProjectName: getProjectName
     });
-    if (noteTexts.length === 0) {
-      // Fallback: grab any <p> blocks that look like descriptions
-      document.querySelectorAll('p').forEach(p => {
-        const t = p.innerText?.trim();
-        if (t && t.length > 30 && t.length < 1500) noteTexts.push(t);
-      });
+
+    // BC-specific: also look for "invited by" patterns
+    if (!info.gc) {
+      const text = document.body?.innerText || '';
+      const m = text.match(/(?:invited by|posted by|sent by|created by)[:\s]+([A-Z][\w\s&.,'-]{2,60})/im);
+      if (m) info.gc = m[1].trim();
     }
-    info.notes = noteTexts.slice(0, 5).join('\n---\n');
+
+    // BC-specific: check paragraph blocks for notes
+    if (!info.notes) {
+      const noteTexts = [];
+      document.querySelectorAll(
+        '[class*="message"], [class*="Message"], [class*="description"], [class*="Description"], ' +
+        '[class*="note"], [class*="Note"], [class*="comment"], [class*="Comment"], ' +
+        '[data-testid*="message"], [data-testid*="description"]'
+      ).forEach(el => {
+        const t = el.innerText?.trim();
+        if (t && t.length > 10 && t.length < 2000) noteTexts.push(t);
+      });
+      if (noteTexts.length === 0) {
+        document.querySelectorAll('p').forEach(p => {
+          const t = p.innerText?.trim();
+          if (t && t.length > 30 && t.length < 1500) noteTexts.push(t);
+        });
+      }
+      info.notes = noteTexts.slice(0, 5).join('\n---\n');
+    }
 
     return info;
   }
@@ -160,26 +83,21 @@
     const seen = new Set();
 
     function addDoc(doc) {
-      const key = doc.url || doc.name;
-      if (key && !seen.has(key)) {
-        seen.add(key);
-        extractedDocuments.push(doc);
-      }
+      PH.addUniqueDocument(extractedDocuments, doc, seen);
     }
 
-    // Wait for SPA content to render
-    await waitForContent();
+    await PH.waitForContent();
 
-    // Strategy 1: Every <a> on the page - check href and text for file references
+    // Strategy 1: Every <a> on the page
     document.querySelectorAll('a[href]').forEach(el => {
       const href = el.href || '';
       const text = (el.textContent || '').trim();
       const download = el.getAttribute('download') || '';
-      if (isRelevantFile(text) || isRelevantFile(download) || isRelevantUrl(href)) {
+      if (PH.isRelevantFile(text) || PH.isRelevantFile(download) || PH.isRelevantUrl(href)) {
         addDoc({
-          name: download || text || extractFilenameFromUrl(href),
+          name: download || text || PH.extractFilenameFromUrl(href),
           url: href,
-          type: getFileType(download || text || href),
+          type: PH.getFileType(download || text || href),
           source: 'BuildingConnected'
         });
       }
@@ -190,18 +108,18 @@
       const text = (el.textContent || '').trim().toLowerCase();
       const url = el.dataset?.url || el.dataset?.href || '';
       if (text.includes('download') || url) {
-        if (isRelevantUrl(url) || isRelevantFile(text)) {
+        if (PH.isRelevantUrl(url) || PH.isRelevantFile(text)) {
           addDoc({
-            name: text || extractFilenameFromUrl(url),
+            name: text || PH.extractFilenameFromUrl(url),
             url: url,
-            type: getFileType(text || url),
+            type: PH.getFileType(text || url),
             source: 'BuildingConnected'
           });
         }
       }
     });
 
-    // Strategy 3: Walk the page text looking for file-name patterns in any element
+    // Strategy 3: Walk the page text looking for file-name patterns
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     while (walker.nextNode()) {
       const text = walker.currentNode.textContent.trim();
@@ -212,7 +130,7 @@
           addDoc({
             name: name.trim(),
             url: closestLink?.href || '',
-            type: getFileType(name),
+            type: PH.getFileType(name),
             source: 'BuildingConnected'
           });
         });
@@ -222,341 +140,69 @@
     // Strategy 4: Click Documents/Files tab if not active, re-scan
     await extractFromDocumentsSection();
 
-    // Log diagnostic info for debugging
-    console.log(`📄 Found ${extractedDocuments.length} documents`);
-    if (extractedDocuments.length === 0) {
-      console.log('🔎 DOM diagnostic - total links:', document.querySelectorAll('a').length);
-      console.log('🔎 DOM diagnostic - total buttons:', document.querySelectorAll('button').length);
-      console.log('🔎 DOM diagnostic - iframes:', document.querySelectorAll('iframe').length);
-      console.log('🔎 DOM diagnostic - page text length:', document.body?.innerText?.length);
-    }
-
+    console.log('📄 Found ' + extractedDocuments.length + ' documents');
     return extractedDocuments;
   }
 
-  // Look for Documents tab and click it to extract documents
+  // Look for Documents tab and click it
   async function extractFromDocumentsSection() {
-    // Find and click Documents tab if not already active
-    const docsTabs = document.querySelectorAll([
-      '[data-testid*="documents"]',
-      '[data-testid*="files"]',
-      '[role="tab"]'
-    ].join(', '));
+    const docsTabs = document.querySelectorAll(
+      '[data-testid*="documents"], [data-testid*="files"], [role="tab"]'
+    );
 
     for (const tab of docsTabs) {
       if (tab.textContent?.toLowerCase().includes('document') ||
           tab.textContent?.toLowerCase().includes('file')) {
-        // Check if already active
         if (!tab.classList.contains('active') && !tab.getAttribute('aria-selected')) {
           tab.click();
-          await sleep(1500); // Wait for content to load
-          // Re-run extraction on new content
-          await extractVisibleDocuments();
+          await PH.sleep(1500);
+          // Re-scan after tab click
+          const seen = new Set(extractedDocuments.map(d => d.url || d.name));
+          document.querySelectorAll('a[href]').forEach(link => {
+            const href = link.href || '';
+            const text = (link.textContent || '').trim();
+            const download = link.getAttribute('download') || '';
+            if (PH.isRelevantFile(text) || PH.isRelevantFile(download) || PH.isRelevantUrl(href)) {
+              PH.addUniqueDocument(extractedDocuments, {
+                name: download || text || PH.extractFilenameFromUrl(href),
+                url: href,
+                type: PH.getFileType(download || text || href),
+                source: 'BuildingConnected'
+              }, seen);
+            }
+          });
         }
         break;
       }
     }
   }
 
-  // Re-scan after tab click
-  async function extractVisibleDocuments() {
-    const seen = new Set(extractedDocuments.map(d => d.url || d.name));
-    document.querySelectorAll('a[href]').forEach(link => {
-      const href = link.href || '';
-      const text = (link.textContent || '').trim();
-      const download = link.getAttribute('download') || '';
-      if (isRelevantFile(text) || isRelevantFile(download) || isRelevantUrl(href)) {
-        const key = href || text;
-        if (!seen.has(key)) {
-          seen.add(key);
-          extractedDocuments.push({
-            name: download || text || extractFilenameFromUrl(href),
-            url: href,
-            type: getFileType(download || text || href),
-            source: 'BuildingConnected'
-          });
-        }
-      }
-    });
-  }
-
-  // Download all extracted documents
-  async function downloadAllDocuments() {
+  // Download all
+  async function doDownloadAll() {
     if (extractedDocuments.length === 0) {
       await extractDocuments();
     }
-
-    if (extractedDocuments.length === 0) {
-      throw new Error('No documents found to download');
-    }
-
-    console.log(`⬇️ Downloading ${extractedDocuments.length} documents...`);
-
-    const projectName = sanitizeFilename(getProjectName());
-    const results = {
-      total: extractedDocuments.length,
-      downloaded: 0,
-      failed: 0,
-      documents: []
-    };
-
-    for (const doc of extractedDocuments) {
-      try {
-        if (doc.url) {
-          // Send download request to background script
-          await chrome.runtime.sendMessage({
-            action: 'downloadFile',
-            url: doc.url,
-            filename: `Bids/${projectName}/${sanitizeFilename(doc.name)}`
-          });
-          results.downloaded++;
-          results.documents.push({ ...doc, status: 'downloaded' });
-        } else {
-          results.failed++;
-          results.documents.push({ ...doc, status: 'no_url' });
-        }
-      } catch (error) {
-        console.error(`Failed to download ${doc.name}:`, error);
-        results.failed++;
-        results.documents.push({ ...doc, status: 'error', error: error.message });
-      }
-
-      // Small delay between downloads to avoid overwhelming
-      await sleep(300);
-    }
-
-    console.log(`✅ Downloaded ${results.downloaded}/${results.total} documents`);
-    return results;
+    return PH.downloadAllDocuments(extractedDocuments, getProjectName());
   }
 
-  // Helper: Check if filename is a relevant document type
-  function isRelevantFile(filename) {
-    if (!filename) return false;
-    const extensions = ['.pdf', '.dwg', '.dxf', '.xlsx', '.xls', '.doc', '.docx', '.zip', '.rar'];
-    const lower = filename.toLowerCase();
-    return extensions.some(ext => lower.includes(ext));
-  }
-
-  // Helper: Check if URL points to a relevant file
-  function isRelevantUrl(url) {
-    if (!url) return false;
-    const lower = url.toLowerCase();
-    return lower.includes('.pdf') ||
-           lower.includes('.dwg') ||
-           lower.includes('.dxf') ||
-           lower.includes('.xlsx') ||
-           lower.includes('.xls') ||
-           lower.includes('.doc') ||
-           lower.includes('.zip') ||
-           lower.includes('download') ||
-           lower.includes('/files/') ||
-           lower.includes('/documents/');
-  }
-
-  // Helper: Get file type from name
-  function getFileType(filename) {
-    const ext = filename?.split('.').pop()?.toLowerCase();
-    const types = {
-      pdf: 'PDF Document',
-      dwg: 'CAD Drawing',
-      dxf: 'CAD Drawing',
-      xlsx: 'Spreadsheet',
-      xls: 'Spreadsheet',
-      doc: 'Word Document',
-      docx: 'Word Document',
-      zip: 'Archive',
-      rar: 'Archive'
-    };
-    return types[ext] || 'Document';
-  }
-
-  // Helper: Extract filename from URL
-  function extractFilenameFromUrl(url) {
-    try {
-      const path = new URL(url).pathname;
-      const filename = path.split('/').pop();
-      return decodeURIComponent(filename.split('?')[0]) || 'document';
-    } catch {
-      return 'document';
-    }
-  }
-
-  // Helper: Sanitize filename
-  function sanitizeFilename(name) {
-    return name
-      .replace(/[<>:"/\\|?*]/g, '')
-      .replace(/\s+/g, '_')
-      .substring(0, 100);
-  }
-
-  // Helper: Wait for SPA content to render
-  async function waitForContent(timeout = 3000) {
-    return new Promise(resolve => {
-      let elapsed = 0;
-      const interval = setInterval(() => {
-        elapsed += 200;
-        // Page has content when body has meaningful text or links exist
-        const hasLinks = document.querySelectorAll('a[href]').length > 5;
-        const hasText = (document.body?.innerText?.length || 0) > 500;
-        if ((hasLinks || hasText) || elapsed >= timeout) {
-          clearInterval(interval);
-          resolve();
-        }
-      }, 200);
+  // Inject button
+  function doInjectButton() {
+    PH.injectDownloadButton({
+      id: 'bid-extractor-bc-btn',
+      prefix: 'bc',
+      onScan: extractDocuments,
+      onDownload: doDownloadAll,
+      getDocumentCount: function() { return extractedDocuments.length; }
     });
   }
 
-  // Helper: Sleep
-  function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
+  // Initialize
+  const init = PH.initPlatform({
+    urlPatterns: ['/opportunity/', '/project/', '/bid/', '/rfp/'],
+    injectButton: doInjectButton
+  });
 
-  // Inject floating download button
-  function injectDownloadButton() {
-    if (document.getElementById('bid-extractor-bc-btn')) return;
-
-    const button = document.createElement('div');
-    button.id = 'bid-extractor-bc-btn';
-    button.innerHTML = `
-      <style>
-        #bid-extractor-bc-btn {
-          position: fixed;
-          bottom: 20px;
-          right: 20px;
-          z-index: 999999;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-        .bc-extract-btn {
-          background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
-          color: white;
-          border: none;
-          padding: 12px 20px;
-          border-radius: 8px;
-          font-size: 14px;
-          font-weight: 600;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-          transition: all 0.2s;
-        }
-        .bc-extract-btn:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 6px 16px rgba(0,0,0,0.4);
-        }
-        .bc-extract-btn.loading {
-          opacity: 0.7;
-          pointer-events: none;
-        }
-        .bc-extract-btn .icon {
-          font-size: 18px;
-        }
-        .bc-doc-count {
-          background: #10b981;
-          color: white;
-          font-size: 12px;
-          padding: 4px 10px;
-          border-radius: 12px;
-          text-align: center;
-        }
-      </style>
-      <div class="bc-doc-count" id="bc-doc-count" style="display:none;">0 documents found</div>
-      <button class="bc-extract-btn" id="bc-scan-btn">
-        <span class="icon">🔍</span>
-        <span>Scan Documents</span>
-      </button>
-      <button class="bc-extract-btn" id="bc-download-btn" style="display:none;">
-        <span class="icon">⬇️</span>
-        <span>Download All</span>
-      </button>
-    `;
-
-    document.body.appendChild(button);
-
-    // Scan button handler
-    document.getElementById('bc-scan-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('bc-scan-btn');
-      const countEl = document.getElementById('bc-doc-count');
-      const downloadBtn = document.getElementById('bc-download-btn');
-
-      btn.classList.add('loading');
-      btn.innerHTML = '<span class="icon">⏳</span><span>Scanning...</span>';
-
-      try {
-        const docs = await extractDocuments();
-        countEl.textContent = `${docs.length} document${docs.length !== 1 ? 's' : ''} found`;
-        countEl.style.display = 'block';
-
-        if (docs.length > 0) {
-          downloadBtn.style.display = 'flex';
-          downloadBtn.innerHTML = `<span class="icon">⬇️</span><span>Download All (${docs.length})</span>`;
-        }
-
-        btn.innerHTML = '<span class="icon">🔍</span><span>Scan Again</span>';
-      } catch (error) {
-        countEl.textContent = 'Error scanning';
-        countEl.style.background = '#ef4444';
-        countEl.style.display = 'block';
-        btn.innerHTML = '<span class="icon">🔍</span><span>Try Again</span>';
-      }
-
-      btn.classList.remove('loading');
-    });
-
-    // Download button handler
-    document.getElementById('bc-download-btn').addEventListener('click', async () => {
-      const btn = document.getElementById('bc-download-btn');
-      btn.classList.add('loading');
-      btn.innerHTML = '<span class="icon">⏳</span><span>Downloading...</span>';
-
-      try {
-        const results = await downloadAllDocuments();
-        btn.innerHTML = `<span class="icon">✅</span><span>Done! (${results.downloaded}/${results.total})</span>`;
-
-        setTimeout(() => {
-          btn.innerHTML = `<span class="icon">⬇️</span><span>Download All (${extractedDocuments.length})</span>`;
-        }, 3000);
-      } catch (error) {
-        btn.innerHTML = '<span class="icon">❌</span><span>Error</span>';
-        setTimeout(() => {
-          btn.innerHTML = `<span class="icon">⬇️</span><span>Download All (${extractedDocuments.length})</span>`;
-        }, 3000);
-      }
-
-      btn.classList.remove('loading');
-    });
-  }
-
-  // Initialize when page is ready
-  function init() {
-    // Only inject on relevant pages
-    const url = window.location.href;
-    if (url.includes('/opportunity/') ||
-        url.includes('/project/') ||
-        url.includes('/bid/') ||
-        url.includes('/rfp/')) {
-      // Wait for page to settle
-      setTimeout(injectDownloadButton, 2000);
-    }
-  }
-
-  // Run initialization
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
-  } else {
-    init();
-  }
-
-  // Also watch for SPA navigation
-  let lastUrl = location.href;
-  new MutationObserver(() => {
-    if (location.href !== lastUrl) {
-      lastUrl = location.href;
-      setTimeout(init, 1000);
-    }
-  }).observe(document.body, { subtree: true, childList: true });
+  // Watch for SPA navigation
+  PH.watchNavigation(init);
 
 })();
