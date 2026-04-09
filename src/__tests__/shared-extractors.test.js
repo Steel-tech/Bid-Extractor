@@ -39,19 +39,20 @@ describe('SharedExtractors.isGreeting', () => {
 });
 
 describe('SharedExtractors.extractProjectName', () => {
-  test('extracts from RFQ subject', () => {
+  test('uses subject as project name (primary behavior)', () => {
     const SE = loadSharedExtractors();
-    expect(SE.extractProjectName('RFQ: Downtown Hospital', '')).toBe('Downtown Hospital');
+    // Subject IS the project name for steel estimators
+    expect(SE.extractProjectName('Downtown Hospital Steel Package', '')).toBe('Downtown Hospital Steel Package');
   });
 
-  test('extracts from Bid subject', () => {
+  test('keeps full subject including bid type prefixes', () => {
     const SE = loadSharedExtractors();
-    expect(SE.extractProjectName('Bid - Steel Package Phase 2', '')).toBe('Steel Package Phase 2');
+    expect(SE.extractProjectName('RFQ: Downtown Hospital', '')).toBe('RFQ: Downtown Hospital');
   });
 
-  test('extracts from Project: subject', () => {
+  test('uses full subject for bid emails', () => {
     const SE = loadSharedExtractors();
-    expect(SE.extractProjectName('Project: New Office Tower', '')).toBe('New Office Tower');
+    expect(SE.extractProjectName('Bid - Steel Package Phase 2', '')).toBe('Bid - Steel Package Phase 2');
   });
 
   test('returns fallback for greeting subjects', () => {
@@ -64,10 +65,11 @@ describe('SharedExtractors.extractProjectName', () => {
     expect(SE.extractProjectName('Hi', '')).toBe('Untitled Project');
   });
 
-  test('strips RE/FW prefixes', () => {
+  test('strips RE/FW prefixes but keeps the rest', () => {
     const SE = loadSharedExtractors();
-    const result = SE.extractProjectName('RE: Big Warehouse Project', '');
-    expect(result).toBe('Big Warehouse Project');
+    expect(SE.extractProjectName('RE: Big Warehouse Project', '')).toBe('Big Warehouse Project');
+    expect(SE.extractProjectName('FW: RE: Hospital Expansion', '')).toBe('Hospital Expansion');
+    expect(SE.extractProjectName('RE: FW: RE: School Renovation', '')).toBe('School Renovation');
   });
 });
 
@@ -82,6 +84,22 @@ describe('SharedExtractors.extractGCName', () => {
     expect(SE.extractGCName('Skanska Construction', '')).toBe('Skanska Construction');
   });
 
+  test('extracts company from sender email domain', () => {
+    const SE = loadSharedExtractors();
+    expect(SE.extractGCName('John Smith', '', 'john@turnerconstruction.com')).toBe('Turner Construction');
+  });
+
+  test('extracts company from hyphenated email domain', () => {
+    const SE = loadSharedExtractors();
+    expect(SE.extractGCName('Jane Doe', '', 'jane@henselphelps.com')).toBe('Henselphelps');
+  });
+
+  test('ignores generic email domains like gmail', () => {
+    const SE = loadSharedExtractors();
+    // Should fall back to sender name, not "Gmail"
+    expect(SE.extractGCName('John Smith', '', 'john@gmail.com')).toBe('John Smith');
+  });
+
   test('returns Unknown for empty inputs', () => {
     const SE = loadSharedExtractors();
     expect(SE.extractGCName('', '')).toBe('Unknown');
@@ -90,6 +108,32 @@ describe('SharedExtractors.extractGCName', () => {
   test('returns sender name as fallback', () => {
     const SE = loadSharedExtractors();
     expect(SE.extractGCName('John Smith', '')).toBe('John Smith');
+  });
+});
+
+describe('SharedExtractors.extractCompanyFromEmail', () => {
+  test('extracts company from construction domain', () => {
+    const SE = loadSharedExtractors();
+    expect(SE.extractCompanyFromEmail('pm@turnerconstruction.com')).toBe('Turner Construction');
+  });
+
+  test('returns empty for generic email providers', () => {
+    const SE = loadSharedExtractors();
+    expect(SE.extractCompanyFromEmail('user@gmail.com')).toBe('');
+    expect(SE.extractCompanyFromEmail('user@yahoo.com')).toBe('');
+    expect(SE.extractCompanyFromEmail('user@outlook.com')).toBe('');
+  });
+
+  test('capitalizes company name', () => {
+    const SE = loadSharedExtractors();
+    const result = SE.extractCompanyFromEmail('info@suffolk.com');
+    expect(result).toBe('Suffolk');
+  });
+
+  test('returns empty for no email', () => {
+    const SE = loadSharedExtractors();
+    expect(SE.extractCompanyFromEmail('')).toBe('');
+    expect(SE.extractCompanyFromEmail(null)).toBe('');
   });
 });
 

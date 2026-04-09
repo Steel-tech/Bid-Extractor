@@ -26,30 +26,22 @@
    * @returns {string}
    */
   function extractProjectName(subject, body) {
-    const patterns = [
-      /(?:RFQ|RFP|ITB|Bid|Quote|Proposal)[:\s-]*(.+?)(?:\s*-|\s*\||$)/i,
-      /Project[:\s]+(.+?)(?:\s*-|\s*\||$)/i,
-      /(?:RE:|FW:)?\s*(.+?)(?:\s*-\s*(?:RFQ|Bid|Steel))/i,
-    ];
+    if (!subject && !body) return 'Untitled Project';
 
-    for (const pattern of patterns) {
-      const match = subject.match(pattern);
-      if (match?.[1]) {
-        const result = cleanText(match[1]);
-        if (!isGreeting(result)) return result;
+    // Primary: the email subject IS the project/job name.
+    // Just strip reply/forward prefixes and clean it up.
+    if (subject) {
+      const cleaned = cleanText(subject.replace(/^(RE:\s*|FW:\s*|FWD:\s*)+/gi, '').trim());
+      if (cleaned.length > 3 && !isGreeting(cleaned)) {
+        return cleaned;
       }
     }
 
-    // Fallback: use subject without common prefixes, but reject greetings
-    const fallback = cleanText(subject.replace(/^(RE:|FW:|RFQ|RFP|ITB)[:\s]*/gi, ''));
-    if (!isGreeting(fallback) && fallback.length > 3) {
-      return fallback;
-    }
-
-    // Subject was a greeting — try body for explicit project/job name fields
+    // Fallback: look for explicit project/job name fields in the body
     const bodyPatterns = [
       /Project(?:\s+Name)?[:\s]+(.+?)(?:\n|$)/i,
       /Job(?:\s+Name)?[:\s]+(.+?)(?:\n|$)/i,
+      /(?:RFQ|RFP|ITB|Bid)[:\s-]+(.+?)(?:\n|$)/i,
     ];
 
     for (const pattern of bodyPatterns) {
@@ -69,35 +61,85 @@
    * @param {string} body - Email body text
    * @returns {string}
    */
-  function extractGCName(senderName, body) {
-    const patterns = [
+  function extractGCName(senderName, body, senderEmail) {
+    // Strategy 1: Look for explicit GC/company labels in the body
+    const bodyPatterns = [
       /(?:General\s+Contractor|GC|Prime)[:\s]+(.+?)(?:\n|$)/i,
-      /(?:From|Sent\s+by)[:\s]+(.+?)(?:\n|$)/i,
-      /(.+?)\s+(?:Construction|Builders|Contracting|General)/i,
+      /(?:Company|Firm)[:\s]+(.+?)(?:\n|$)/i,
     ];
-
-    for (const pattern of patterns) {
+    for (const pattern of bodyPatterns) {
       const match = body.match(pattern);
       if (match?.[1]) {
         const gc = cleanText(match[1]);
-        if (gc.length > 3 && gc.length < 100) {
-          return gc;
+        if (gc.length > 3 && gc.length < 100) return gc;
+      }
+    }
+
+    // Strategy 2: Extract company from sender email domain
+    // e.g. "john@turnerconstruction.com" → "Turner Construction"
+    if (senderEmail) {
+      const domain = extractCompanyFromEmail(senderEmail);
+      if (domain && domain.length > 2) return domain;
+    }
+
+    // Strategy 3: Check if sender name looks like a company
+    if (senderName) {
+      if (senderName.match(/(?:Construction|Builders|Contracting|Inc|LLC|Corp|Group|Associates|Partners|Company|Co\.)/i)) {
+        return cleanText(senderName);
+      }
+      // Check for "Name at Company" pattern
+      const atMatch = senderName.match(/(?:at|@|from|,)\s+(.+)/i);
+      if (atMatch) return cleanText(atMatch[1]);
+    }
+
+    // Strategy 4: Look for company names in the body near common patterns
+    const companyPatterns = [
+      /(.+?)\s+(?:Construction|Builders|Contracting|General\s+Contractors?)/i,
+    ];
+    for (const pattern of companyPatterns) {
+      const match = body.match(pattern);
+      if (match?.[1]) {
+        const gc = cleanText(match[1]);
+        // Only use if it looks like a company name (capitalized, reasonable length)
+        if (gc.length > 2 && gc.length < 60 && /^[A-Z]/.test(gc)) {
+          return gc + ' ' + (match[0].match(/(Construction|Builders|Contracting|General\s+Contractors?)/i)?.[0] || '');
         }
       }
     }
 
-    if (senderName) {
-      const companyMatch = senderName.match(/(?:at|@|from)\s+(.+)/i);
-      if (companyMatch) {
-        return cleanText(companyMatch[1]);
-      }
-
-      if (senderName.match(/(?:Construction|Builders|Contracting|Inc|LLC|Corp)/i)) {
-        return cleanText(senderName);
-      }
-    }
-
     return senderName || 'Unknown';
+  }
+
+  /**
+   * Extract company name from email domain
+   * e.g. "john@turnerconstruction.com" → "Turner Construction"
+   * e.g. "pm@henselphelps.com" → "Hensel Phelps"
+   * @param {string} email
+   * @returns {string}
+   */
+  function extractCompanyFromEmail(email) {
+    if (!email || !email.includes('@')) return '';
+    const domain = email.split('@')[1]?.split('.')[0] || '';
+    if (!domain || domain.length < 3) return '';
+
+    // Skip generic email providers
+    const genericDomains = ['gmail', 'yahoo', 'hotmail', 'outlook', 'aol', 'icloud',
+                            'live', 'msn', 'mail', 'protonmail', 'ymail', 'comcast',
+                            'att', 'verizon', 'cox', 'charter', 'spectrum'];
+    if (genericDomains.includes(domain.toLowerCase())) return '';
+
+    // Convert camelCase or concatenated words to spaced words
+    // e.g. "turnerconstruction" → "Turner Construction"
+    // e.g. "henselphelps" → "Hensel Phelps"
+    const spaced = domain
+      .replace(/([a-z])([A-Z])/g, '$1 $2')  // camelCase
+      .replace(/([a-z])(construction|builders|contracting|group|inc|llc|corp|co|company|general|steel|mechanical|electric|plumbing|hvac|associates|partners|services|industries)/gi, '$1 $2');  // known suffixes
+
+    // Capitalize each word
+    return spaced
+      .split(/[\s-]+/)
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
   }
 
   /**
@@ -405,6 +447,7 @@
     isGreeting,
     extractProjectName,
     extractGCName,
+    extractCompanyFromEmail,
     extractBidDate,
     extractLocation,
     extractScope,

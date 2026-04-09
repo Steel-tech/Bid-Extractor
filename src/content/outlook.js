@@ -173,7 +173,7 @@ async function extractBidInfo() {
 
   const bidInfo = {
     project: parsed.sections.project || SE.extractProjectName(subject, emailText),
-    gc: parsed.signature.company || SE.extractGCName(senderName, emailText),
+    gc: parsed.signature.company || SE.extractGCName(senderName, emailText, senderEmail),
     bidDate: SE.extractBidDate(emailText),
     location: parsed.sections.location || SE.extractLocation(emailText),
     scope: parsed.sections.scope || SE.extractScope(emailText),
@@ -182,7 +182,7 @@ async function extractBidInfo() {
     phone: parsed.signature.phone || SE.extractPhone(emailText),
 
     projectManager: parsed.metadata.projectManager || parsed.signature.name || '',
-    gcCompany: parsed.signature.company || SE.extractGCName(senderName, emailText),
+    gcCompany: parsed.signature.company || SE.extractGCName(senderName, emailText, senderEmail),
     gcEmail: parsed.signature.email || senderEmail,
     gcPhone: parsed.signature.phone || SE.extractPhone(emailText),
     bidTime: parsed.metadata.bidTime || '',
