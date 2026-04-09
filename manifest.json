@@ -15,6 +15,8 @@
     "https://outlook.office.com/*",
     "https://outlook.office365.com/*",
     "https://*.outlook.com/*",
+    "https://outlook.cloud.microsoft/*",
+    "https://*.cloud.microsoft/*",
     "https://*.buildingconnected.com/*",
     "https://app.buildingconnected.com/*",
     "https://*.planhub.com/*",
@@ -52,7 +54,9 @@
         "https://outlook.live.com/*",
         "https://outlook.office.com/*",
         "https://outlook.office365.com/*",
-        "https://*.outlook.com/*"
+        "https://*.outlook.com/*",
+        "https://outlook.cloud.microsoft/*",
+        "https://*.cloud.microsoft/*"
       ],
       "js": ["src/utils/config-loader.js", "src/utils/safe-query.js", "src/utils/shared-extractors.js", "src/content/email-parser.js", "src/content/outlook.js"],
       "css": ["src/content/content.css"]
@@ -101,6 +105,8 @@
         "https://outlook.office.com/*",
         "https://outlook.office365.com/*",
         "https://*.outlook.com/*",
+        "https://outlook.cloud.microsoft/*",
+        "https://*.cloud.microsoft/*",
         "https://*.buildingconnected.com/*",
         "https://app.buildingconnected.com/*",
         "https://*.planhub.com/*",

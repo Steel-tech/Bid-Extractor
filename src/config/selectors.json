@@ -70,17 +70,28 @@
       "div[dir=\"ltr\"][class*=\"body\"]",
       ".rps_8d7c",
       "div[style*=\"font-family\"]",
-      "[role=\"document\"]"
+      "[role=\"document\"]",
+      "[data-testid=\"reading-pane-item-content\"]",
+      "[class*=\"BodyFragment\"]",
+      "[class*=\"bodyFragment\"]",
+      "div[class*=\"OGHPW\"]",
+      "div[class*=\"XbIp4\"]"
     ],
     "subject": [
       "[aria-label*=\"Subject\"]",
       ".rps_8d7f",
-      "span[title][role=\"heading\"]"
+      "span[title][role=\"heading\"]",
+      "[data-testid=\"subject-line\"]",
+      "[class*=\"subjectLine\"]",
+      "h1[class*=\"subject\"]"
     ],
     "sender": [
       "[aria-label*=\"From\"]",
       ".rps_8d70",
-      "[autoid*=\"PersonaCard\"]"
+      "[autoid*=\"PersonaCard\"]",
+      "[data-testid=\"sender-name\"]",
+      "[class*=\"senderName\"]",
+      "span[class*=\"persona\"]"
     ],
     "attachments": [
       "[aria-label*=\"Attachment\"]",
@@ -93,7 +104,8 @@
     ],
     "emailOpenIndicator": [
       "[aria-label*=\"Message body\"]",
-      "[id*=\"UniqueMessageBody\"]"
+      "[id*=\"UniqueMessageBody\"]",
+      "[data-testid=\"reading-pane-item-content\"]"
     ]
   }
 }

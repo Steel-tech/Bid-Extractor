@@ -190,6 +190,8 @@ const PLATFORM_SITES = [
   { pattern: 'outlook.live.com', type: 'email', name: 'Outlook', action: 'extract' },
   { pattern: 'outlook.office.com', type: 'email', name: 'Outlook', action: 'extract' },
   { pattern: 'outlook.office365.com', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'outlook.cloud.microsoft', type: 'email', name: 'Outlook', action: 'extract' },
+  { pattern: 'cloud.microsoft/mail', type: 'email', name: 'Outlook', action: 'extract' },
   { pattern: 'buildingconnected.com', type: 'platform', name: 'BuildingConnected', action: 'extractDocuments' },
   { pattern: 'planhub.com', type: 'platform', name: 'PlanHub', action: 'extractDocuments' },
   { pattern: 'procore.com', type: 'platform', name: 'Procore', action: 'extractDocuments' },
