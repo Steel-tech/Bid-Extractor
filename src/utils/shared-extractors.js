@@ -168,9 +168,9 @@
    */
   function extractScope(body) {
     const patterns = [
-      /(?:Scope|Work|Package)[:\s]+(.+?)(?:\n\n|\n[A-Z]|$)/is,
+      /(?:Scope|Work|Package)[:\s]+(.+?)(?:\n\n|\n[A-Z]|$)/i,
       /(?:Steel|Structural)\s+(?:Package|Scope)[:\s]+(.+?)(?:\n|$)/i,
-      /(?:includes?|requiring)[:\s]+(.+?)(?:\n\n|$)/is,
+      /(?:includes?|requiring)[:\s]+(.+?)(?:\n\n|$)/i,
     ];
 
     for (const pattern of patterns) {
@@ -286,7 +286,7 @@
       const href = link.href?.toLowerCase() || '';
       const text = link.innerText?.trim() || '';
 
-      if (!href || href.startsWith('javascript:') || href.startsWith('mailto:')) return;
+      if (!href || href.startsWith('javascript:') || href.startsWith('mailto:') || href.startsWith('data:')) return;
 
       // Check if link matches any platform
       for (const [domain, info] of Object.entries(platforms)) {

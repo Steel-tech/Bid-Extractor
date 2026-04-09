@@ -573,13 +573,16 @@ function displayDownloadLinks(links) {
     linkItem.innerHTML =
       '<span class="link-icon">' + (link.icon || '📄') + '</span>' +
       '<div class="link-info">' +
-        '<div class="link-platform">' + link.platform + '</div>' +
-        '<div class="link-text">' + link.text + '</div>' +
+        '<div class="link-platform">' + UI.escapeHtml(link.platform) + '</div>' +
+        '<div class="link-text">' + UI.escapeHtml(link.text) + '</div>' +
       '</div>' +
       '<span class="link-open">Open →</span>';
 
     linkItem.addEventListener('click', () => {
-      chrome.tabs.create({ url: link.url });
+      const safe = sanitizeUrl(link.url);
+      if (safe && safe !== '#') {
+        chrome.tabs.create({ url: safe });
+      }
     });
 
     linksList.appendChild(linkItem);
@@ -597,9 +600,9 @@ function displayDownloadLinks(links) {
       ' Open All ' + links.length + ' Links';
 
     openAllBtn.addEventListener('click', () => {
-      links.forEach((link, i) => {
+      links.filter(l => sanitizeUrl(l.url) && sanitizeUrl(l.url) !== '#').forEach((link, i) => {
         setTimeout(() => {
-          chrome.tabs.create({ url: link.url, active: i === 0 });
+          chrome.tabs.create({ url: sanitizeUrl(link.url), active: i === 0 });
         }, i * 300);
       });
     });
@@ -856,13 +859,16 @@ async function loadRecentExtractions() {
     return;
   }
 
-  const scoredExtractions = recentExtractions.map((item, originalIndex) => ({
-    ...item,
-    originalIndex,
-    priorityScore: calculatePriorityScore(item),
-    priorityLevel: getPriorityLevel(calculatePriorityScore(item)),
-    priorityLabel: getPriorityLabel(calculatePriorityScore(item))
-  }));
+  const scoredExtractions = recentExtractions.map((item, originalIndex) => {
+    const score = calculatePriorityScore(item);
+    return {
+      ...item,
+      originalIndex,
+      priorityScore: score,
+      priorityLevel: getPriorityLevel(score),
+      priorityLabel: getPriorityLabel(score)
+    };
+  });
 
   scoredExtractions.sort((a, b) => b.priorityScore - a.priorityScore);
 

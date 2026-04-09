@@ -282,6 +282,16 @@ describe('SharedExtractors.extractDownloadLinks', () => {
     const links = SE.extractDownloadLinks(emailBody, null);
     expect(links.length).toBe(0);
   });
+
+  test('filters out data: URIs', () => {
+    const SE = loadSharedExtractors();
+    document.body.innerHTML = '<div id="email"><a href="data:text/html,<script>alert(1)</script>">Malicious</a><a href="https://example.com/plans.pdf">Plans</a></div>';
+    const emailBody = document.getElementById('email');
+    const links = SE.extractDownloadLinks(emailBody, null);
+    // Only the https link should pass
+    expect(links.length).toBe(1);
+    expect(links[0].url).toContain('plans.pdf');
+  });
 });
 
 describe('SharedExtractors double-initialization guard', () => {
