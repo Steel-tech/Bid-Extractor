@@ -44,6 +44,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         .catch(err => sendResponse({ success: false, error: err.message }));
       return true;
 
+    case 'loadConfig':
+      loadConfigForContentScript(request.configName)
+        .then(config => sendResponse({ success: true, config }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+      return true;
+
     // Blueprint-related actions
     case 'openBlueprintViewer':
       openBlueprintViewer(request.url, request.filename);
@@ -338,6 +344,29 @@ chrome.runtime.onInstalled.addListener((details) => {
 });
 
 console.log('Bid Extractor background service worker started');
+
+// ===== CONFIG LOADING FOR CONTENT SCRIPTS =====
+// Content scripts may not be able to fetch() chrome-extension:// URLs due to host page CSP.
+// Background service worker can always fetch its own resources.
+
+const bgConfigCache = new Map();
+
+async function loadConfigForContentScript(configName) {
+  if (bgConfigCache.has(configName)) {
+    return bgConfigCache.get(configName);
+  }
+
+  const url = chrome.runtime.getURL(`src/config/${configName}.json`);
+  const response = await fetch(url);
+
+  if (!response.ok) {
+    throw new Error(`Failed to load config: ${configName} (${response.status})`);
+  }
+
+  const config = await response.json();
+  bgConfigCache.set(configName, config);
+  return config;
+}
 
 // ===== PLATFORM SUPPORT =====
 // Platforms will send 'downloadFile' messages which are handled above

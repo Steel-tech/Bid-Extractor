@@ -1,7 +1,8 @@
 // @ts-nocheck
 // Config Loader for Bid Extractor
 // Loads JSON config files and caches them
-// TODO: Enable type checking after incremental migration
+// Uses XMLHttpRequest (synchronous fallback) because fetch() on chrome-extension:// URLs
+// can fail in MV3 content scripts due to host page CSP or extension context issues.
 
 const configCache = new Map();
 
@@ -16,21 +17,82 @@ async function loadConfig(configName) {
     return configCache.get(configName);
   }
 
+  const url = chrome.runtime.getURL(`src/config/${configName}.json`);
+
+  // Strategy 1: Try fetch() first (works in popup and some content script contexts)
   try {
-    const url = chrome.runtime.getURL(`src/config/${configName}.json`);
     const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`Failed to load config: ${configName} (${response.status})`);
+    if (response.ok) {
+      const config = await response.json();
+      configCache.set(configName, config);
+      return config;
     }
-
-    const config = await response.json();
-    configCache.set(configName, config);
-    return config;
-  } catch (error) {
-    console.error(`Config Loader: Error loading ${configName}:`, error);
-    throw error;
+  } catch (fetchErr) {
+    // fetch() failed — fall through to XMLHttpRequest
+    console.warn(`Config Loader: fetch() failed for ${configName}, trying XHR...`);
   }
+
+  // Strategy 2: Synchronous XMLHttpRequest (reliable in content scripts)
+  try {
+    const config = loadConfigSync(url);
+    if (config) {
+      configCache.set(configName, config);
+      return config;
+    }
+  } catch (xhrErr) {
+    console.error(`Config Loader: XHR also failed for ${configName}:`, xhrErr);
+  }
+
+  // Strategy 3: Ask background script to load it
+  try {
+    const config = await loadConfigViaBackground(configName);
+    if (config) {
+      configCache.set(configName, config);
+      return config;
+    }
+  } catch (bgErr) {
+    console.error(`Config Loader: Background fallback failed for ${configName}:`, bgErr);
+  }
+
+  throw new Error(`Failed to load config: ${configName} (all strategies failed)`);
+}
+
+/**
+ * Load config synchronously via XMLHttpRequest
+ * @param {string} url - chrome-extension:// URL
+ * @returns {Object|null}
+ */
+function loadConfigSync(url) {
+  const xhr = new XMLHttpRequest();
+  xhr.open('GET', url, false); // synchronous
+  xhr.send();
+  if (xhr.status === 200 || xhr.status === 0) { // status 0 is normal for chrome-extension:// URLs
+    return JSON.parse(xhr.responseText);
+  }
+  return null;
+}
+
+/**
+ * Load config by asking the background service worker
+ * @param {string} configName
+ * @returns {Promise<Object>}
+ */
+function loadConfigViaBackground(configName) {
+  return new Promise((resolve, reject) => {
+    try {
+      chrome.runtime.sendMessage({ action: 'loadConfig', configName }, (response) => {
+        if (chrome.runtime.lastError) {
+          reject(chrome.runtime.lastError);
+        } else if (response?.success) {
+          resolve(response.config);
+        } else {
+          reject(new Error(response?.error || 'Background config load failed'));
+        }
+      });
+    } catch (e) {
+      reject(e);
+    }
+  });
 }
 
 /**
